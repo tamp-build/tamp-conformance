@@ -20,9 +20,10 @@ Initial cut. Emits the `conformance.evaluated` contract from Tamp.Core 1.17.0 (c
 - **BYOK model seam + provider-agnostic rule extraction.** `IChatCompletion` (thin provider shim) + `ModelConfig` (endpoint-overridable for gov/Azure/air-gapped endpoints), and `LlmRuleExtractor` — an `IRuleExtractor` that turns ADR prose into rules via any provider, with the extraction prompt, deterministic/semantic classification, calibrated abstention, and JSON parsing all in core (unit-tested without a network).
 - **`Tamp.Conformance.Anthropic` adapter.** `AnthropicChat : IChatCompletion` — a thin shim over the Anthropic Messages API (the recommended default), endpoint-overridable, key resolved from `ANTHROPIC_API_KEY` or `~/.claude/credentials.json`, never emitted. Verified end-to-end extracting rules from a live ADR.
 - **`Tamp.Conformance.OpenAiCompatible` adapter.** One `OpenAiCompatibleChat : IChatCompletion` that, via a base-URL override, covers **OpenAI, Azure OpenAI, Poolside, and any self-hosted / air-gapped OpenAI-compatible endpoint** (vLLM, Ollama). Configurable auth (`Authorization: Bearer` or Azure's raw `api-key` header), a `ForPoolside` convenience, clean standard payloads (no `cache_control`), and tolerant of an extra `reasoning_content` (Poolside thinking).
+- **Target surface + orchestration.** `ConformanceOptions` / `RuleStore` (per-ADR rule-set layout, ADR + code-file discovery) and `ConformanceRunner`: `GenerateRules` (write-to-working-tree only — no git op, so branch protection is respected by construction) and `Check` (read-only; fails closed on **missing** or **stale** rules, runs the deterministic path, routes semantic rules to the evaluator or `unknown`, and honors advisory vs enforcing). Exposed as Tamp.Components-style DIM targets `IAdrRules` (write) and `ICheckAdrConformance` (read-only gate) via `IHazConformance`.
 
 ### Not yet
 
-- The semantic (model-backed) conformance *evaluator* behind `ISemanticEvaluator` + the adversarial verify pass.
+- The semantic (model-backed) conformance *evaluator* implementation behind `ISemanticEvaluator` + the adversarial verify pass (the runner already routes to it).
 - Further BYOK adapters where auth diverges from OpenAI-compatible: Bedrock (SigV4), Vertex.
 - Component-interface / target surface for wiring the three capabilities into a consumer's `Build.cs`.

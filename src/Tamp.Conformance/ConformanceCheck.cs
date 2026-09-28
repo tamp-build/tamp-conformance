@@ -145,6 +145,9 @@ public static class ConformanceCheck
         }
     }
 
+    /// <summary>The subset of <paramref name="files"/> a rule's <see cref="AdrRule.Scope"/> globs match (all files when scope is empty). Public so the semantic path can scope identically.</summary>
+    public static IReadOnlyList<AbsolutePath> FilesInScope(AdrRule rule, AbsolutePath repoRoot, IReadOnlyList<AbsolutePath> files) => InScope(rule, repoRoot, files);
+
     private static List<AbsolutePath> InScope(AdrRule rule, AbsolutePath repoRoot, IReadOnlyList<AbsolutePath> files)
     {
         if (rule.Scope is null || rule.Scope.Count == 0)
