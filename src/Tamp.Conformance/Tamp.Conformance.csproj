@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <RootNamespace>Tamp.Conformance</RootNamespace>
+    <AssemblyName>Tamp.Conformance</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Package">
+    <PackageId>Tamp.Conformance</PackageId>
+    <Description>Agentic ADR-conformance review for Tamp builds. Compares a repo's code against its Architecture Decision Records and emits conformance verdicts on the canonical BuildEvent stream (conformance.evaluated, ADR 0023) for downstream attestation in tamp-findings. Three capabilities: rule generation (ADR to machine-checkable rules), rule examination (code vs rules), and reverse examination (code decisions with no ADR). The deterministic (predicate) path is self-contained; the semantic (model-backed) path plugs in a host-provided evaluator.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(TampCorePath)" Condition="'$(TampCoreMode)' == 'project'" />
+    <PackageReference Include="Tamp.Core" Condition="'$(TampCoreMode)' == 'package'" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
+  </ItemGroup>
+
+</Project>
