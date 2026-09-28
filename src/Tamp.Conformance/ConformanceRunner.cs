@@ -76,6 +76,7 @@ public static class ConformanceRunner
                 else
                 {
                     r = semantic.Evaluate(set, rule, inScope);
+                    r = r with { Blocks = options.Enforcing && r.Verdict != ConformanceVerdict.Pass };
                     Emit(r, set, options);
                 }
                 results.Add(r);
