@@ -30,6 +30,26 @@ public static class RuleStore
     /// <summary>The committed rule-set path for one ADR.</summary>
     public static AbsolutePath RulesPath(AbsolutePath rulesDir, string adrId) => rulesDir / $"{adrId}.json";
 
+    /// <summary>One-line summaries ("&lt;adrId&gt;: &lt;title&gt;") of the ADRs — the "known ADRs" context for reverse examination.</summary>
+    public static IReadOnlyList<string> AdrSummaries(AbsolutePath adrDir)
+        => AdrFiles(adrDir).Select(a => $"{a.AdrId}: {FirstHeading(a.File)}").ToList();
+
+    private static string FirstHeading(AbsolutePath file)
+    {
+        try
+        {
+            foreach (var raw in File.ReadLines(file.Value))
+            {
+                var line = raw.Trim();
+                if (line.Length == 0)
+                    continue;
+                return line.TrimStart('#').Trim();
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* fall through */ }
+        return "(untitled)";
+    }
+
     /// <summary>All code files under <paramref name="root"/>, skipping <paramref name="ignoreDirs"/> anywhere in the path.</summary>
     public static IReadOnlyList<AbsolutePath> CodeFiles(AbsolutePath root, IReadOnlyList<string> ignoreDirs)
     {

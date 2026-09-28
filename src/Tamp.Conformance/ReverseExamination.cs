@@ -44,4 +44,31 @@ public static class ReverseExamination
 
         return candidates;
     }
+
+    /// <summary>
+    /// End-to-end reverse examination: run the deterministic <see cref="Triggers"/>, then hand any hits to the
+    /// model-backed <paramref name="detector"/> to judge which are ADR-worthy and uncovered. <b>Advisory
+    /// only</b> — surfaces each as a SARIF <c>note</c> diagnostic (<c>undocumented-decision:&lt;kind&gt;</c>);
+    /// never blocks. Returns the (possibly empty) list of undocumented decisions.
+    /// </summary>
+    public static IReadOnlyList<UndocumentedDecision> Detect(
+        AbsolutePath repoRoot,
+        IReadOnlyList<AbsolutePath> files,
+        IReadOnlyDictionary<string, string> signals,
+        IDecisionDetector detector,
+        IReadOnlyList<string> knownAdrSummaries,
+        bool emit = true)
+    {
+        var candidates = Triggers(repoRoot, files, signals);
+        if (candidates.Count == 0)
+            return Array.Empty<UndocumentedDecision>();
+
+        var decisions = detector.Detect(candidates, knownAdrSummaries);
+
+        if (emit)
+            foreach (var d in decisions)
+                BuildEvents.Diagnostic($"undocumented-decision:{d.Kind}", "note", d.Summary, d.File, d.Line);
+
+        return decisions;
+    }
 }
