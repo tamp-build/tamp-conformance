@@ -19,9 +19,10 @@ Initial cut. Emits the `conformance.evaluated` contract from Tamp.Core 1.17.0 (c
 - **Semantic seams.** `ISemanticEvaluator` / `IRuleExtractor` / `IDecisionDetector` — the model-backed plug-in points the deterministic path does not depend on.
 - **BYOK model seam + provider-agnostic rule extraction.** `IChatCompletion` (thin provider shim) + `ModelConfig` (endpoint-overridable for gov/Azure/air-gapped endpoints), and `LlmRuleExtractor` — an `IRuleExtractor` that turns ADR prose into rules via any provider, with the extraction prompt, deterministic/semantic classification, calibrated abstention, and JSON parsing all in core (unit-tested without a network).
 - **`Tamp.Conformance.Anthropic` adapter.** `AnthropicChat : IChatCompletion` — a thin shim over the Anthropic Messages API (the recommended default), endpoint-overridable, key resolved from `ANTHROPIC_API_KEY` or `~/.claude/credentials.json`, never emitted. Verified end-to-end extracting rules from a live ADR.
+- **`Tamp.Conformance.OpenAiCompatible` adapter.** One `OpenAiCompatibleChat : IChatCompletion` that, via a base-URL override, covers **OpenAI, Azure OpenAI, Poolside, and any self-hosted / air-gapped OpenAI-compatible endpoint** (vLLM, Ollama). Configurable auth (`Authorization: Bearer` or Azure's raw `api-key` header), a `ForPoolside` convenience, clean standard payloads (no `cache_control`), and tolerant of an extra `reasoning_content` (Poolside thinking).
 
 ### Not yet
 
 - The semantic (model-backed) conformance *evaluator* behind `ISemanticEvaluator` + the adversarial verify pass.
-- Additional BYOK adapters: `.OpenAiCompatible` (covers Azure OpenAI, Poolside via base-URL override, and self-hosted/air-gapped), Bedrock, Vertex.
+- Further BYOK adapters where auth diverges from OpenAI-compatible: Bedrock (SigV4), Vertex.
 - Component-interface / target surface for wiring the three capabilities into a consumer's `Build.cs`.

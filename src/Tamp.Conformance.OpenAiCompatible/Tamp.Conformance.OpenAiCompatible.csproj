@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <RootNamespace>Tamp.Conformance.OpenAiCompatible</RootNamespace>
+    <AssemblyName>Tamp.Conformance.OpenAiCompatible</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Package">
+    <PackageId>Tamp.Conformance.OpenAiCompatible</PackageId>
+    <Description>OpenAI-compatible bring-your-own-key adapter for Tamp.Conformance. One thin IChatCompletion shim over the /chat/completions API that, via a base-URL override, covers OpenAI, Azure OpenAI, Poolside, and any self-hosted / air-gapped OpenAI-compatible endpoint (vLLM, Ollama). Auth header is configurable (Bearer or api-key). The key is read from the environment and never emitted.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Tamp.Conformance\Tamp.Conformance.csproj" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
+  </ItemGroup>
+
+</Project>
