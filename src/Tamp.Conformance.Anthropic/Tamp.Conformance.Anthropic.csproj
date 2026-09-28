@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <RootNamespace>Tamp.Conformance.Anthropic</RootNamespace>
+    <AssemblyName>Tamp.Conformance.Anthropic</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Package">
+    <PackageId>Tamp.Conformance.Anthropic</PackageId>
+    <Description>Anthropic (Claude) bring-your-own-key adapter for Tamp.Conformance. A thin IChatCompletion shim over the Anthropic Messages API — the recommended default provider for ADR rule extraction and semantic conformance checks. Endpoint is overridable for Anthropic-compatible gateways; the key is read from the environment (or ~/.claude/credentials.json for local use) and never emitted.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Tamp.Conformance\Tamp.Conformance.csproj" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
+  </ItemGroup>
+
+</Project>

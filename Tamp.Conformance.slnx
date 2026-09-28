@@ -10,6 +10,7 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Tamp.Conformance/Tamp.Conformance.csproj" />
+    <Project Path="src/Tamp.Conformance.Anthropic/Tamp.Conformance.Anthropic.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Tamp.Conformance.Tests/Tamp.Conformance.Tests.csproj" />
