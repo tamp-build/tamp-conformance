@@ -15,10 +15,16 @@ namespace Tamp.Conformance;
 public sealed class LlmRuleExtractor : IRuleExtractor
 {
     private readonly IChatCompletion _model;
+    private readonly ExtractionProfile _profile;
 
-    public LlmRuleExtractor(IChatCompletion model) => _model = model;
+    public LlmRuleExtractor(IChatCompletion model, ExtractionProfile? profile = null)
+    {
+        _model = model;
+        _profile = profile ?? ExtractionProfile.Default;
+    }
 
-    private const string System = """
+    // The fixed integrity spine. These clauses are NOT project-tunable — they are the tool's soundness.
+    private const string Spine = """
         You extract machine-checkable conformance rules from a software Architecture Decision Record (ADR).
 
         For each consequence or constraint the ADR commits to, emit one rule. Classify each rule:
@@ -34,15 +40,30 @@ public sealed class LlmRuleExtractor : IRuleExtractor
         - ABSTAIN: if a consequence cannot be made into a sound, low-false-positive rule, DO NOT emit it.
           Emitting nothing is correct; inventing a shaky rule is not.
         - "id": "<adr>-r<n>" (e.g. "0018-r1"). "claim": a short quote/paraphrase of the ADR text.
-        - "controlRefs": optional NIST 800-53 control ids the rule is evidence for (e.g. ["CM-6"]).
-
-        Respond with ONLY a JSON object: {"rules": [ ... ]}. No prose, no markdown fences.
         """;
+
+    // Composes the fixed spine with the injected per-project context (framework, stack, domain).
+    internal string BuildSystemPrompt()
+    {
+        var sb = new System.Text.StringBuilder(Spine);
+        sb.Append("\n- \"controlRefs\": optional ").Append(_profile.ControlFramework)
+          .Append(" control ids the rule is evidence for (e.g. ").Append(_profile.ControlExample)
+          .Append("). Use only ids valid in ").Append(_profile.ControlFramework)
+          .Append("; if none clearly applies, omit controlRefs — do not invent a mapping.");
+        if (!string.IsNullOrWhiteSpace(_profile.ControlCatalogueHint))
+            sb.Append("\n  ").Append(_profile.ControlCatalogueHint);
+        if (!string.IsNullOrWhiteSpace(_profile.ProjectContext))
+            sb.Append("\n\nProject context: ").Append(_profile.ProjectContext);
+        if (!string.IsNullOrWhiteSpace(_profile.StackConventions))
+            sb.Append("\nStack conventions: ").Append(_profile.StackConventions);
+        sb.Append("\n\nRespond with ONLY a JSON object: {\"rules\": [ ... ]}. No prose, no markdown fences.");
+        return sb.ToString();
+    }
 
     public IReadOnlyList<AdrRule> Extract(string adrId, string adrText)
     {
         var user = $"ADR id: {adrId}\n\n----- ADR TEXT -----\n{adrText}";
-        var raw = _model.Complete(System, user);
+        var raw = _model.Complete(BuildSystemPrompt(), user);
         var json = ExtractJsonObject(raw);
         var parsed = JsonSerializer.Deserialize<ExtractionResult>(json, JsonOpts)
                      ?? throw new FormatException("Rule extraction returned no parseable object.");
