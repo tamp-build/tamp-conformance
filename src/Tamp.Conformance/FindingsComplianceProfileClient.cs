@@ -6,12 +6,13 @@ namespace Tamp.Conformance;
 
 /// <summary>
 /// HTTP <see cref="IComplianceProfileClient"/> against tamp-findings'
-/// <c>GET {endpoint}/api/v1/projects/self/compliance-profile</c>, authenticated with the ingest token as a
+/// <c>GET {endpoint}/projects/self/compliance-profile</c> (findings' ingest/gate surface is un-prefixed;
+/// versioning lives in the response body), authenticated with the project ingest token (<c>prj_…</c>) as a
 /// bearer credential. Read-only; the token never leaves the request header.
 /// </summary>
 public sealed class FindingsComplianceProfileClient : IComplianceProfileClient, IDisposable
 {
-    private const string Path = "/api/v1/projects/self/compliance-profile";
+    private const string Path = "/projects/self/compliance-profile";
     private readonly HttpClient _http;
 
     public FindingsComplianceProfileClient(HttpClient? http = null) => _http = http ?? new HttpClient();

@@ -134,7 +134,7 @@ public sealed class ControlProfileSourceTests
 
         var profile = client.Get("https://findings.example/", "tok123");
 
-        Assert.Equal("https://findings.example/api/v1/projects/self/compliance-profile", handler.Url);
+        Assert.Equal("https://findings.example/projects/self/compliance-profile", handler.Url);
         Assert.Equal("Bearer tok123", handler.Authorization);
         Assert.Equal("SOC 2", profile.Framework.Name);
         Assert.Equal("CC8.1", profile.Controls![0].Id);

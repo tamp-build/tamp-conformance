@@ -15,9 +15,13 @@ public interface IComplianceProfileClient
 /// <summary>The project compliance profile returned by tamp-findings (subset consumed by conformance).</summary>
 public sealed record ComplianceProfile
 {
+    public string? SchemaVersion { get; init; }
     public string? ProjectId { get; init; }
+    public string? ProjectName { get; init; }
     public required FrameworkInfo Framework { get; init; }
     public IReadOnlyList<ControlInfo>? Controls { get; init; }
+    public string? AsOf { get; init; }
+    // policyTemplates / enforcement are also returned by findings; add typed fields here if/when consumed.
 }
 
 public sealed record FrameworkInfo
