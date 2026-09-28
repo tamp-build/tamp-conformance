@@ -38,6 +38,23 @@ public sealed record AdrRule
 
     /// <summary>Control identifiers this rule is evidence for (e.g. <c>CM-6</c>, <c>SA-15</c>).</summary>
     public IReadOnlyList<string>? ControlRefs { get; init; }
+
+    // --- ZT / mandate annotations (round-trip with the verdict; findings stores + scores on these) ---
+
+    /// <summary>Zero Trust pillar this rule scores (maturity), e.g. <c>Identity</c>. Null for non-ZT rules.</summary>
+    public string? ZtPillar { get; init; }
+
+    /// <summary>Zero Trust function within the pillar, e.g. <c>Authentication</c>.</summary>
+    public string? ZtFunction { get; init; }
+
+    /// <summary>The maturity stage (1–4) the decision represents — orthogonal to the verdict. Null for non-ZT / binary rules.</summary>
+    public int? ZtStage { get; init; }
+
+    /// <summary>The binary mandate id this rule satisfies (e.g. <c>mfa</c>). Null for maturity/control rules.</summary>
+    public string? MandateId { get; init; }
+
+    /// <summary><c>Draft</c> | <c>Reviewed</c> — review gate rides through; policy (findings-side) decides whether a Draft rule may block.</summary>
+    public string? ReviewStatus { get; init; }
 }
 
 /// <summary>
