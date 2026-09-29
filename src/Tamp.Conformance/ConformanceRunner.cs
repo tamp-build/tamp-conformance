@@ -71,7 +71,7 @@ public static class ConformanceRunner
                 ConformanceResult r;
                 if (semantic is null)
                 {
-                    r = Meta(adrId, rule.Id, ConformanceVerdict.Unknown, "Semantic rule but no evaluator configured.", options, rule.ControlRefs);
+                    r = Meta(adrId, rule.Id, ConformanceVerdict.Unknown, "Semantic rule but no evaluator configured.", options, rule.ControlRefs, rule);
                 }
                 else
                 {
@@ -88,7 +88,7 @@ public static class ConformanceRunner
     }
 
     private static ConformanceResult Meta(
-        string adrId, string ruleId, string verdict, string reason, ConformanceOptions options, IReadOnlyList<string>? controlRefs = null)
+        string adrId, string ruleId, string verdict, string reason, ConformanceOptions options, IReadOnlyList<string>? controlRefs = null, AdrRule? rule = null)
     {
         var r = new ConformanceResult
         {
@@ -99,6 +99,10 @@ public static class ConformanceRunner
             Method = ConformanceMethod.Deterministic,
             Blocks = options.Enforcing && verdict != ConformanceVerdict.Pass,
             ControlRefs = controlRefs,
+            ZtPillar = rule?.ZtPillar,
+            ZtFunction = rule?.ZtFunction,
+            ZtStage = rule?.ZtStage,
+            MandateId = rule?.MandateId,
         };
         Emit(r, null, options);
         return r;
@@ -115,6 +119,7 @@ public static class ConformanceRunner
         BuildEvents.Conformance(
             adrRef: r.AdrRef, ruleId: r.RuleId, verdict: r.Verdict, method: r.Method,
             adrQuote: r.AdrQuote, codeEvidence: r.CodeEvidence, file: r.File, line: r.Line,
-            blocks: r.Blocks, provenance: provenance, controlRefs: r.ControlRefs);
+            blocks: r.Blocks, provenance: provenance, controlRefs: r.ControlRefs,
+            ztPillar: r.ZtPillar, ztFunction: r.ZtFunction, ztStage: r.ZtStage, mandateId: r.MandateId);
     }
 }

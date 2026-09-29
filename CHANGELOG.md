@@ -6,6 +6,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Added
+
+- **Zero-Trust overlay on emitted verdicts.** The four ZT/mandate annotations already carried on `AdrRule` (`ztPillar`/`ztFunction`/`ztStage`/`mandateId`) now flow through `ConformanceResult` onto the emitted `conformance.evaluated` event, on every path (deterministic, semantic, and the semantic-without-evaluator abstention). Requires **Tamp.Core 1.17.1** (which added those fields to `ConformanceEvaluatedPayload`). The rule overlay and the emitted-verdict overlay are now one consistent set — proven live against the tamp-findings lab: 90 verdicts forwarded with `ztPillar` on 21 and `mandateId` on 5, so findings can score ZTMM maturity and reconcile binary mandates from the evidence.
+
 ## [0.1.0] — 2026-09-28 — Scaffold: deterministic ADR-conformance
 
 Initial cut. Emits the `conformance.evaluated` contract from Tamp.Core 1.17.0 (core [ADR 0023](https://github.com/tamp-build/tamp/blob/main/docs/adr/0023-attestation-evidence-contract.md)).

@@ -91,6 +91,27 @@ public sealed class ConformanceCheckTests
     }
 
     [Fact]
+    public void Zt_Overlay_Carries_From_Rule_Onto_The_Verdict()
+    {
+        using var repo = new Repo();
+        var f = repo.Write("src/Secret.cs", "public string Reveal() => _value;\n");
+        var set = OneRule(new AdrRule
+        {
+            Id = "0005-r1", Claim = "secrets never leak their raw value", ForbiddenPattern = "=> _value",
+            Scope = new[] { "**/Secret.cs" }, ControlRefs = new[] { "SC-28" },
+            ZtPillar = "Data", ZtFunction = "Data Encryption", ZtStage = 3, MandateId = "encrypt-at-rest",
+        });
+
+        var r = ConformanceCheck.CheckDeterministic(set, repo.Root, new[] { f }, emit: false)[0];
+
+        Assert.Equal(ConformanceVerdict.Fail, r.Verdict);
+        Assert.Equal("Data", r.ZtPillar);                 // overlay rides through to the evidence
+        Assert.Equal("Data Encryption", r.ZtFunction);
+        Assert.Equal(3, r.ZtStage);
+        Assert.Equal("encrypt-at-rest", r.MandateId);
+    }
+
+    [Fact]
     public void Semantic_Rules_Are_Skipped_By_The_Deterministic_Pass()
     {
         using var repo = new Repo();

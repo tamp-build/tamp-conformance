@@ -22,6 +22,12 @@ public sealed record ConformanceResult
 
     public bool Blocks { get; init; }
     public IReadOnlyList<string>? ControlRefs { get; init; }
+
+    // ZT / mandate overlay carried from the producing rule onto the verdict (see core ADR 0023; findings scores on these).
+    public string? ZtPillar { get; init; }
+    public string? ZtFunction { get; init; }
+    public int? ZtStage { get; init; }
+    public string? MandateId { get; init; }
 }
 
 /// <summary>
@@ -77,7 +83,11 @@ public static class ConformanceCheck
                     line: result.Line,
                     blocks: result.Blocks,
                     provenance: provenance,
-                    controlRefs: result.ControlRefs);
+                    controlRefs: result.ControlRefs,
+                    ztPillar: result.ZtPillar,
+                    ztFunction: result.ZtFunction,
+                    ztStage: result.ZtStage,
+                    mandateId: result.MandateId);
             }
         }
 
@@ -99,6 +109,10 @@ public static class ConformanceCheck
             Method = ConformanceMethod.Deterministic,
             Blocks = blocks && verdict != ConformanceVerdict.Pass,
             ControlRefs = rule.ControlRefs,
+            ZtPillar = rule.ZtPillar,
+            ZtFunction = rule.ZtFunction,
+            ZtStage = rule.ZtStage,
+            MandateId = rule.MandateId,
         };
 
         // A deterministic rule with no predicate is not deterministically checkable — never a pass.

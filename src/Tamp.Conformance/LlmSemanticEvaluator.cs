@@ -59,6 +59,10 @@ public sealed class LlmSemanticEvaluator : ISemanticEvaluator
             Method = method,
             Blocks = verdict != ConformanceVerdict.Pass,
             ControlRefs = rule.ControlRefs,
+            ZtPillar = rule.ZtPillar,
+            ZtFunction = rule.ZtFunction,
+            ZtStage = rule.ZtStage,
+            MandateId = rule.MandateId,
         };
 
         if (inScopeFiles.Count == 0)
