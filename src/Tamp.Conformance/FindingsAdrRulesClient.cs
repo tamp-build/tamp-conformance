@@ -35,6 +35,26 @@ public sealed record AdrRulesPushResult
     public int Upserted { get; init; }
     public int Retired { get; init; }
     public int Active { get; init; }
+
+    /// <summary>
+    /// POA&amp;Ms auto-closed because a rule they depended on was invalidated by this push (findings TFND-196:
+    /// a reviewed rule whose content changed is forced to Draft, so a mandate it backed is no longer backed by
+    /// an active + reviewed rule → its POA&amp;M is superseded/cancelled with an audit reason). Empty/absent when
+    /// nothing was superseded.
+    /// </summary>
+    public IReadOnlyList<SupersededPoam>? Superseded { get; init; }
+}
+
+/// <summary>One POA&amp;M closed by a supersession (see <see cref="AdrRulesPushResult.Superseded"/>). Fields are best-effort; <see cref="Extra"/> captures anything else findings returns so the contract can evolve without breaking this client.</summary>
+public sealed record SupersededPoam
+{
+    public string? PoamId { get; init; }
+    public string? MandateId { get; init; }
+    public string? Reason { get; init; }
+    public string? PriorStatus { get; init; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; init; }
 }
 
 /// <summary>HTTP <see cref="IAdrRulesStore"/> — <c>POST /projects/self/adr-rules</c> + <c>GET /projects/self/adr-ruleset</c>, Bearer <c>prj_</c>.</summary>
