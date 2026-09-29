@@ -32,4 +32,15 @@ public sealed record ModelConfig
     public required string ModelId { get; init; }
 
     public int MaxTokens { get; init; } = 4096;
+
+    /// <summary>
+    /// Optional sampling temperature. <b>Defaults to <see langword="null"/></b> — the field is omitted and the
+    /// provider's default applies. This is deliberate: the newest Claude models (e.g. <c>claude-opus-4-8</c>)
+    /// have <b>deprecated</b> <c>temperature</c> and reject the request if it is sent, so we never send it unless
+    /// asked. Attestation reproducibility does <b>not</b> depend on this knob anyway — a semantic verdict is made
+    /// once and <b>frozen</b> with its <c>modelId</c>/<c>commitSha</c>/<c>rulesSha</c> provenance (ADR 0023 /
+    /// tamp-findings ADR 0001), never recomputed. Set a value only for a provider/model that still supports it
+    /// (many OpenAI-compatible and older endpoints do) when you want to pin sampling.
+    /// </summary>
+    public double? Temperature { get; init; }
 }
