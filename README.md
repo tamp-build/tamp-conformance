@@ -40,6 +40,51 @@ A semantic (model-produced) verdict is non-deterministic, so it is **frozen** in
 snapshot with its `commitSha` + `rulesSha` + `modelId` (a `Provenance` record on the event) rather than
 recomputed — the "snapshot the verdict" posture from core ADR 0023 / tamp-findings ADR 0001.
 
+## Model support (BYOK)
+
+The semantic path is **bring-your-own-key**: pick a provider by dropping in an `IChatCompletion` adapter.
+The API key/credentials are the adapter's concern, read from the environment (or `~/.claude/credentials.json`
+for local Anthropic use) and **never emitted** on the build stream.
+
+| Adapter package | Covers |
+|---|---|
+| `Tamp.Conformance.Anthropic` | Anthropic Messages API (the recommended default) |
+| `Tamp.Conformance.OpenAiCompatible` | OpenAI, Azure OpenAI, Poolside, and any self-hosted / air-gapped OpenAI-compatible server — **vLLM, Ollama** — via a base-URL override |
+| `Tamp.Conformance.Bedrock` | AWS Bedrock (Claude models), hand-rolled SigV4, GovCloud/FIPS/VPC endpoints |
+
+Ollama needs no extra code — point `ModelConfig.Endpoint` at `http://localhost:11434/v1` and the
+OpenAI-compatible adapter talks to it; `modelId` is frozen into provenance as `ollama/<model>`.
+
+### How the models compare
+
+A first-pass evaluation of **rule extraction** (the hardest structured task — ADR prose → a strict-JSON
+rule-set) on a representative, rule-rich ADR. Judged on schema-valid JSON, rule count, how many rules
+carry a runnable regex, pattern correctness, and latency.
+
+| Model | Provider | Latency | Rules | JSON/schema | Pattern quality | Verdict |
+|---|---|--:|--:|---|---|---|
+| **claude-sonnet-5** | Anthropic | ~31s | 10 | ✅ | Excellent — precise, well-scoped | Best quality |
+| **claude-opus-4-8** | Anthropic | ~12s | 9 | ✅ | Excellent — clean, correct | Fast + precise |
+| **claude-haiku-4-5** | Anthropic | ~15s | 13 | ✅ | Good — mild over-extraction | Strong value pick |
+| **qwen3:14b** | Ollama (local) | ~94s | 3 | ✅ | Mixed — some malformed patterns | Only viable local model |
+| **llama3.1:8b** | Ollama (local) | ~12s | 4 | ✅ | Broken — regex matches everything | Unusable output |
+| **gemma4:12b** | Ollama (local) | ~204s | — | ❌ missing required fields | — | Failed |
+| **qwen3.5:9b** | Ollama (local) | ~169s | — | ❌ no JSON emitted | — | Failed |
+| **granite4.2:8b** | Ollama (local) | ~349s | — | ❌ no JSON emitted | — | Failed |
+
+**Takeaways.** All three Anthropic models are production-viable; **Sonnet/Opus** for the write-path
+(rule generation lands as attestation evidence and is human-reviewed, so fidelity wins over speed) and
+**Haiku** for the high-volume check/semantic-eval path. Among local models, only **qwen3:14b** produced
+schema-valid, runnable rules — sparse and slow, but a reasonable **air-gapped fallback**; the smaller
+(8–9B) and non-adhering models either emit broken regex or can't hold the strict-JSON contract.
+
+> **Caveats — read this as a signal, not a benchmark.** Measured on a *single ADR* with a *single run*
+> per model (2026-09; core commit `ec37295`). Semantic verdicts are non-deterministic (the newest Claude
+> models have *deprecated* the `temperature` knob, so runs vary), and only the *extraction* task was
+> measured — local models may fare better on the simpler yes/no semantic-eval verdicts. Latencies include
+> cold model loads for local inference. Your ADRs, hardware, and Ollama context settings will shift these
+> numbers. Re-run against your own corpus before trusting a model for attestation-grade output.
+
 ## The rules file
 
 `adr-rules.json` lives in the **governed repo's** git, not here — versioned intent next to the code it
