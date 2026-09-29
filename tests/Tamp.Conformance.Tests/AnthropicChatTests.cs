@@ -52,6 +52,19 @@ public sealed class AnthropicChatTests
     }
 
     [Fact]
+    public void Truncation_At_Max_Tokens_Throws_A_Clear_Error()
+    {
+        // stop_reason "max_tokens" means the (likely-JSON) output is cut off — surface it, don't hand back broken text.
+        var handler = new CapturingHandler("""{"content":[{"type":"text","text":"{\"rules\":[{\"id\":\"r1\""}],"stop_reason":"max_tokens"}""");
+        using var http = new HttpClient(handler);
+        var chat = new AnthropicChat("k", new ModelConfig { ModelId = "claude-sonnet-5", MaxTokens = 4096 }, http);
+
+        var ex = Assert.Throws<FormatException>(() => chat.Complete("s", "u"));
+        Assert.Contains("truncated", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("MaxTokens", ex.Message);
+    }
+
+    [Fact]
     public void Non_Success_Surfaces_The_Api_Error_Body()
     {
         var handler = new CapturingHandler("""{"type":"error","error":{"message":"credit balance too low"}}""", HttpStatusCode.BadRequest);

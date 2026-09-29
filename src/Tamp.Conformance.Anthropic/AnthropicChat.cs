@@ -59,6 +59,9 @@ public sealed class AnthropicChat : IChatCompletion, IDisposable
 
         var parsed = JsonSerializer.Deserialize<MessagesResponse>(payload, JsonOpts)
                      ?? throw new FormatException("Anthropic API returned no parseable body.");
+        if (parsed.StopReason == "max_tokens")
+            throw new FormatException(
+                $"Anthropic response was truncated at max_tokens ({_config.MaxTokens}); the output is incomplete. Raise ModelConfig.MaxTokens.");
         var sb = new StringBuilder();
         foreach (var block in parsed.Content ?? Array.Empty<ContentBlock>())
         {
@@ -118,6 +121,7 @@ public sealed class AnthropicChat : IChatCompletion, IDisposable
     private sealed record MessagesResponse
     {
         public IReadOnlyList<ContentBlock>? Content { get; init; }
+        public string? StopReason { get; init; }
     }
 
     private sealed record ContentBlock

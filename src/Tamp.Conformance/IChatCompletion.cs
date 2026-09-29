@@ -31,7 +31,12 @@ public sealed record ModelConfig
     /// <summary>Model identifier as the provider expects it, e.g. <c>claude-opus-4-8</c> or <c>poolside/laguna-s-2.1</c>.</summary>
     public required string ModelId { get; init; }
 
-    public int MaxTokens { get; init; } = 4096;
+    /// <summary>
+    /// Max output tokens. Defaults to <c>8192</c> — rule extraction emits a JSON array that can be sizeable, and a
+    /// too-small budget truncates it into invalid JSON (a silent failure the adapters now turn into a clear
+    /// "response truncated" error). Raise it for very large ADRs.
+    /// </summary>
+    public int MaxTokens { get; init; } = 8192;
 
     /// <summary>
     /// Optional sampling temperature. <b>Defaults to <see langword="null"/></b> — the field is omitted and the

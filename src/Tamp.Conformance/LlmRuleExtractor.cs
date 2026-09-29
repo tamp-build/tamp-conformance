@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace Tamp.Conformance;
 
@@ -70,15 +71,38 @@ public sealed class LlmRuleExtractor : IRuleExtractor
         return parsed.Rules ?? Array.Empty<AdrRule>();
     }
 
-    /// <summary>Tolerate a model that wraps JSON in prose or ```json fences: take the outermost {...}.</summary>
+    /// <summary>
+    /// Extract the JSON object from a model's raw output, tolerant of the ways local/thinking models wrap it:
+    /// inline reasoning blocks (<c>&lt;think&gt;…&lt;/think&gt;</c>, whose braces would otherwise fool the scan),
+    /// markdown code fences, and surrounding prose. Strips reasoning, prefers a fenced object, then falls back to
+    /// the outermost <c>{…}</c>.
+    /// </summary>
     internal static string ExtractJsonObject(string raw)
     {
-        var start = raw.IndexOf('{');
-        var end = raw.LastIndexOf('}');
+        if (string.IsNullOrWhiteSpace(raw))
+            throw new FormatException("No JSON object found in model output (empty).");
+
+        // 1. Drop reasoning blocks some models emit inline — their braces would corrupt the brace scan.
+        var cleaned = ThinkBlock.Replace(raw, string.Empty);
+
+        // 2. Prefer the contents of a fenced code block if the model wrapped the JSON in one.
+        var fence = FencedObject.Match(cleaned);
+        if (fence.Success)
+            return fence.Groups[1].Value;
+
+        // 3. Fall back to the outermost {...}.
+        var start = cleaned.IndexOf('{');
+        var end = cleaned.LastIndexOf('}');
         if (start < 0 || end <= start)
             throw new FormatException("No JSON object found in model output.");
-        return raw.Substring(start, end - start + 1);
+        return cleaned.Substring(start, end - start + 1);
     }
+
+    private static readonly Regex ThinkBlock =
+        new("<think(?:ing)?>.*?</think(?:ing)?>", RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static readonly Regex FencedObject =
+        new(@"```(?:json)?\s*(\{.*\})\s*```", RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     internal static readonly JsonSerializerOptions JsonOpts = new()
     {

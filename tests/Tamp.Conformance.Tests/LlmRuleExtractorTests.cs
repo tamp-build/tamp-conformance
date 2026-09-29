@@ -43,6 +43,24 @@ public sealed class LlmRuleExtractorTests
     }
 
     [Fact]
+    public void Strips_Think_Blocks_Whose_Braces_Would_Fool_The_Scan()
+    {
+        // A thinking model emits reasoning (with braces!) before the answer — the naive outermost-{...} would grab it.
+        var thinky = "<think>I should emit {rules} with an array. Let me consider {this} and {that}.</think>\n" + GoodJson;
+        var rules = new LlmRuleExtractor(new FakeModel(thinky)).Extract("0018", "x");
+        Assert.Equal(2, rules.Count);
+        Assert.Equal("0018-r1", rules[0].Id);
+    }
+
+    [Fact]
+    public void Strips_Think_Blocks_Even_Inside_A_Fence()
+    {
+        var thinkyFenced = "<thinking>plan: {a:1}</thinking>\n```json\n" + GoodJson + "\n```";
+        var rules = new LlmRuleExtractor(new FakeModel(thinkyFenced)).Extract("0018", "x");
+        Assert.Equal(2, rules.Count);
+    }
+
+    [Fact]
     public void Empty_Rules_Array_Is_Valid_Abstention()
     {
         var rules = new LlmRuleExtractor(new FakeModel("""{"rules":[]}""")).Extract("0099", "x");
