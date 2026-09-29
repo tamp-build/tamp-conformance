@@ -6,6 +6,11 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Added
+
+- **Reverse-examination → tamp-findings (`FindingsDiagnosticsClient`).** `IDiagnosticsIngestClient` POSTs the `undocumented-decision:<kind>` advisory notes (`diagnostic.emitted`) to findings' `POST /ingest/diagnostics` (findings ADR 0013) — a **separate** endpoint from `/ingest/conformance` so advisory counts never muddy the conformance verdict counts. findings binds each note to a CV by `provenance.commitSha`, defaults its control to CM-3, and never gates/POA&Ms on it. Proven live against the lab: reverse-examination over tamp → 3 undocumented decisions → `accepted=3`.
+- **`ModelConfig.Temperature`.** Optional sampling temperature, **default `null`** (omit → provider default). Deliberately opt-in: the newest Claude models (e.g. `claude-opus-4-8`) have *deprecated* `temperature` and reject the request if it's sent. Attestation reproducibility comes from freezing the verdict + provenance, not from this knob; it exists for OpenAI-compatible/older endpoints that still honor it. Threaded through both adapters (dropped on the wire when null).
+
 ## [0.1.0] — 2026-09-28 — Agentic ADR-conformance: generate · check · attest
 
 First release. Turns a repo's ADRs into machine-checkable rules, checks code against them (deterministic + model-backed), and emits the `conformance.evaluated` attestation contract from Tamp.Core 1.17.1 (core [ADR 0023](https://github.com/tamp-build/tamp/blob/main/docs/adr/0023-attestation-evidence-contract.md)) — integrated with **tamp-findings** as the authoritative rule store and evidence sink. Proven end-to-end live against a findings lab (tamp-core project): extract → push → fetch → check → ingest → gate, including a real go/no-go block on a genuine drift.

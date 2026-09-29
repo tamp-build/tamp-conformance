@@ -55,6 +55,7 @@ public sealed class OpenAiCompatibleChat : IChatCompletion, IDisposable
         {
             Model = _config.ModelId,
             MaxTokens = _config.MaxTokens,
+            Temperature = _config.Temperature,
             Messages = new[]
             {
                 new Message { Role = "system", Content = system },
@@ -107,6 +108,7 @@ public sealed class OpenAiCompatibleChat : IChatCompletion, IDisposable
     {
         public required string Model { get; init; }
         public required int MaxTokens { get; init; }
+        public double? Temperature { get; init; }
         public required IReadOnlyList<Message> Messages { get; init; }
     }
 
