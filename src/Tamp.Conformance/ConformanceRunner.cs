@@ -61,30 +61,74 @@ public static class ConformanceRunner
                 continue;   // don't check against stale rules
             }
 
-            // Deterministic rules — pure, reproducible, emitted.
-            results.AddRange(ConformanceCheck.CheckDeterministic(set, options.RepoRoot, codeFiles, options.CommitSha, options.Enforcing, emit: true));
-
-            // Semantic rules — routed to the model-backed evaluator, or unknown when none is wired.
-            foreach (var rule in set.Rules.Where(r => r.Kind == RuleKind.Semantic))
-            {
-                var inScope = ConformanceCheck.FilesInScope(rule, options.RepoRoot, codeFiles);
-                ConformanceResult r;
-                if (semantic is null)
-                {
-                    r = Meta(adrId, rule.Id, ConformanceVerdict.Unknown, "Semantic rule but no evaluator configured.", options, rule.ControlRefs, rule);
-                }
-                else
-                {
-                    r = semantic.Evaluate(set, rule, inScope);
-                    r = r with { Blocks = options.Enforcing && r.Verdict != ConformanceVerdict.Pass };
-                    Emit(r, set, options);
-                }
-                results.Add(r);
-            }
+            RunSet(set, codeFiles, options, semantic, results);
         }
 
         var passed = !options.Enforcing || results.All(r => r.Verdict == ConformanceVerdict.Pass);
         return new ConformanceRunResult { Results = results, Passed = passed };
+    }
+
+    /// <summary>
+    /// Check code against a rule-set <b>fetched from tamp-findings</b> (the authoritative store, ADR 0003) —
+    /// the integrated gate. Same read-only, four-valued, emitting behavior as <see cref="Check"/>, but the
+    /// rules come from the flat active set findings serves (grouped back into per-ADR sets), so there is no
+    /// local rule file to read and no ADR-file staleness gate: the fetched set <i>is</i> the truth. Use this
+    /// wherever findings is wired; <see cref="Check"/> stays for standalone/offline runs against committed rules.
+    /// </summary>
+    public static ConformanceRunResult CheckFetched(
+        IReadOnlyList<AdrRuleWithRef> fetched, ConformanceOptions options, ISemanticEvaluator? semantic = null)
+    {
+        var results = new List<ConformanceResult>();
+        var codeFiles = RuleStore.CodeFiles(options.RepoRoot, options.IgnoreDirs);
+
+        foreach (var group in fetched.GroupBy(r => r.AdrRef).OrderBy(g => g.Key, StringComparer.Ordinal))
+        {
+            var rules = group.Select(r => r.Rule).ToList();
+            var set = new AdrRuleSet
+            {
+                Adr = group.Key,
+                // No ADR-file hash on the wire; stamp a deterministic content hash of the fetched rules so
+                // provenance.rulesSha still pins which interpretation ran (findings is authoritative anyway).
+                SourceSha = "findings:" + AbsolutePath.Sha256Of(string.Join("\n", rules.Select(RuleFingerprint))),
+                ExtractedBy = "tamp-findings",
+                Rules = rules,
+            };
+            RunSet(set, codeFiles, options, semantic, results);
+        }
+
+        var passed = !options.Enforcing || results.All(r => r.Verdict == ConformanceVerdict.Pass);
+        return new ConformanceRunResult { Results = results, Passed = passed };
+    }
+
+    private static string RuleFingerprint(AdrRule r)
+        => string.Join("|", r.Id, r.Kind, r.ForbiddenPattern, r.RequiredPattern,
+            r.Scope is null ? "" : string.Join(",", r.Scope), r.Claim);
+
+    /// <summary>Run one rule-set (deterministic + semantic) against the code, appending verdicts and emitting each.</summary>
+    private static void RunSet(
+        AdrRuleSet set, IReadOnlyList<AbsolutePath> codeFiles, ConformanceOptions options,
+        ISemanticEvaluator? semantic, List<ConformanceResult> results)
+    {
+        // Deterministic rules — pure, reproducible, emitted.
+        results.AddRange(ConformanceCheck.CheckDeterministic(set, options.RepoRoot, codeFiles, options.CommitSha, options.Enforcing, emit: true));
+
+        // Semantic rules — routed to the model-backed evaluator, or unknown when none is wired.
+        foreach (var rule in set.Rules.Where(r => r.Kind == RuleKind.Semantic))
+        {
+            var inScope = ConformanceCheck.FilesInScope(rule, options.RepoRoot, codeFiles);
+            ConformanceResult r;
+            if (semantic is null)
+            {
+                r = Meta(set.Adr, rule.Id, ConformanceVerdict.Unknown, "Semantic rule but no evaluator configured.", options, rule.ControlRefs, rule);
+            }
+            else
+            {
+                r = semantic.Evaluate(set, rule, inScope);
+                r = r with { Blocks = options.Enforcing && r.Verdict != ConformanceVerdict.Pass };
+                Emit(r, set, options);
+            }
+            results.Add(r);
+        }
     }
 
     private static ConformanceResult Meta(

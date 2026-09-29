@@ -16,6 +16,19 @@ public interface IHazConformance
 
     /// <summary>Optional semantic evaluator for <see cref="ICheckAdrConformance"/>; when null, semantic rules resolve to <c>unknown</c>.</summary>
     ISemanticEvaluator? SemanticEvaluator => null;
+
+    /// <summary>
+    /// Optional adr-rules store. When set together with <see cref="FindingsEndpoint"/> + <see cref="FindingsIngestToken"/>,
+    /// <see cref="ICheckAdrConformance"/> fetches the <b>authoritative</b> active rule-set from tamp-findings (ADR 0003)
+    /// and checks against it, instead of the committed local rules. Null → the local committed rules are used (standalone/offline).
+    /// </summary>
+    IAdrRulesStore? AdrRulesStore => null;
+
+    /// <summary>tamp-findings base URL for the fetch-from-findings check path. Null unless the integrated path is wired.</summary>
+    string? FindingsEndpoint => null;
+
+    /// <summary>Project-scoped ingest token (<c>prj_…</c>) for the fetch-from-findings check path. Null unless wired.</summary>
+    string? FindingsIngestToken => null;
 }
 
 /// <summary>
@@ -32,20 +45,28 @@ public interface IAdrRules : IHazConformance
 }
 
 /// <summary>
-/// The <c>CheckAdrConformance</c> target — verify code against the committed rules. <b>Read-only</b>: never
-/// writes. Fails closed on stale/missing rules (the staleness gate), routes semantic rules to the evaluator
+/// The <c>CheckAdrConformance</c> target — verify code against the rules. <b>Read-only</b>: never writes.
+/// When a findings store + endpoint + token are wired (<see cref="IHazConformance.AdrRulesStore"/>), it fetches
+/// the <b>authoritative</b> active rule-set from tamp-findings (ADR 0003) and checks against it; otherwise it
+/// falls back to the committed local rules (and their staleness gate). Routes semantic rules to the evaluator
 /// when configured, and throws (failing the build) when enforcing and any verdict is not <c>pass</c>.
 /// </summary>
 public interface ICheckAdrConformance : IHazConformance
 {
     Target CheckAdrConformance => _ => _
-        .Description("Check code against the committed adr-rules; fails closed on stale rules and blocking verdicts.")
+        .Description("Check code against the adr-rules (authoritative from tamp-findings when wired, else committed rules); fails closed on blocking verdicts.")
         .Executes(() =>
         {
-            var result = ConformanceRunner.Check(ConformanceOptions, SemanticEvaluator);
+            var result = FetchesFromFindings
+                ? ConformanceRunner.CheckFetched(AdrRulesStore!.FetchActive(FindingsEndpoint!, FindingsIngestToken!), ConformanceOptions, SemanticEvaluator)
+                : ConformanceRunner.Check(ConformanceOptions, SemanticEvaluator);
             if (!result.Passed)
                 throw new InvalidOperationException(
                     $"ADR conformance failed: {result.Fails} fail, {result.Unknowns} unknown, {result.Errors} error " +
                     $"({result.Results.Count(r => r.Blocks)} blocking). See the conformance.evaluated events for detail.");
         });
+
+    /// <summary>True when the integrated (fetch-from-findings) path is fully configured.</summary>
+    private bool FetchesFromFindings =>
+        AdrRulesStore is not null && !string.IsNullOrWhiteSpace(FindingsEndpoint) && !string.IsNullOrWhiteSpace(FindingsIngestToken);
 }
