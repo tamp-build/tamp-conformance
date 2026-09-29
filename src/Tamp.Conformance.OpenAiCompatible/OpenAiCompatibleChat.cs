@@ -78,6 +78,9 @@ public sealed class OpenAiCompatibleChat : IChatCompletion, IDisposable
 
         var parsed = JsonSerializer.Deserialize<ChatResponse>(payload, JsonOpts)
                      ?? throw new FormatException("OpenAI-compatible API returned no parseable body.");
+        if (parsed.Choices is { Count: > 0 } && parsed.Choices[0].FinishReason == "length")
+            throw new FormatException(
+                $"Model response was truncated at max_tokens ({_config.MaxTokens}); the output is incomplete. Raise ModelConfig.MaxTokens (or the server's context window).");
         return parsed.Choices is { Count: > 0 } ? parsed.Choices[0].Message?.Content ?? "" : "";
     }
 
@@ -126,6 +129,7 @@ public sealed class OpenAiCompatibleChat : IChatCompletion, IDisposable
     private sealed record Choice
     {
         public ResponseMessage? Message { get; init; }
+        public string? FinishReason { get; init; }
     }
 
     private sealed record ResponseMessage

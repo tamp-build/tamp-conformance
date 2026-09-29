@@ -79,6 +79,17 @@ public sealed class OpenAiCompatibleChatTests
     }
 
     [Fact]
+    public void Truncation_Finish_Reason_Length_Throws_A_Clear_Error()
+    {
+        var handler = new CapturingHandler("""{"choices":[{"message":{"content":"{\"rules\":[{\"id\":"},"finish_reason":"length"}]}""");
+        using var http = new HttpClient(handler);
+        var chat = new OpenAiCompatibleChat("k", new ModelConfig { ModelId = "qwen3:14b", MaxTokens = 8192 }, http, providerLabel: "ollama");
+
+        var ex = Assert.Throws<FormatException>(() => chat.Complete("s", "u"));
+        Assert.Contains("truncated", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void Non_Success_Surfaces_Error_Body()
     {
         var handler = new CapturingHandler("""{"error":{"message":"model not found"}}""", HttpStatusCode.NotFound);
