@@ -122,6 +122,42 @@ public sealed class ConformanceRunnerTests : IDisposable
     }
 
     [Fact]
+    public void CheckFetched_Runs_The_Findings_Ruleset_With_No_Local_Files_Or_Staleness_Gate()
+    {
+        // No ADRs and no committed .rules on disk — the fetched set IS the truth (findings is authoritative).
+        Write("src/App.csproj", "<Project>\n  <PackageReference Include=\"X\" Version=\"*\" />\n</Project>\n");
+        var fetched = new[]
+        {
+            new AdrRuleWithRef { AdrRef = "0001", Rule = new AdrRule { Id = "0001-r1", Claim = "no floating versions", ForbiddenPattern = "Version=\"\\*\"", Scope = new[] { "**/*.csproj" }, ZtPillar = "Data", ZtStage = 2 } },
+        };
+
+        var result = ConformanceRunner.CheckFetched(fetched, _options);
+
+        Assert.False(result.Passed);                     // the fetched rule catches the floating version
+        Assert.Equal(1, result.Fails);
+        var fail = Assert.Single(result.Results, r => r.Verdict == ConformanceVerdict.Fail);
+        Assert.Equal("0001-r1", fail.RuleId);
+        Assert.Equal("Data", fail.ZtPillar);             // ZT overlay rides through the fetched path too
+        Assert.DoesNotContain(result.Results, r => r.RuleId is "rules-missing" or "rules-stale");   // no local gates
+    }
+
+    [Fact]
+    public void CheckFetched_Groups_A_Flat_Set_By_Adr()
+    {
+        Write("src/App.csproj", "<Project>\n  <PackageReference Include=\"X\" Version=\"1.2.3\" />\n</Project>\n");
+        var fetched = new[]
+        {
+            new AdrRuleWithRef { AdrRef = "0001", Rule = new AdrRule { Id = "0001-r1", Claim = "no floating", ForbiddenPattern = "Version=\"\\*\"", Scope = new[] { "**/*.csproj" } } },
+            new AdrRuleWithRef { AdrRef = "0002", Rule = new AdrRule { Id = "0002-r1", Claim = "no floating", ForbiddenPattern = "Version=\"\\*\"", Scope = new[] { "**/*.csproj" } } },
+        };
+
+        var result = ConformanceRunner.CheckFetched(fetched, _options);
+
+        Assert.True(result.Passed);                       // exact pin honors both
+        Assert.Equal(2, result.Results.Count);            // one verdict per fetched rule, across two ADRs
+    }
+
+    [Fact]
     public void Semantic_Rule_Uses_The_Evaluator_When_Present_Else_Unknown()
     {
         Write("docs/adr/0001-native.md", "# ADR 0001\nnative UI only.\n");
