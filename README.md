@@ -85,12 +85,57 @@ schema-valid, runnable rules — sparse and slow, but a reasonable **air-gapped 
 > cold model loads for local inference. Your ADRs, hardware, and Ollama context settings will shift these
 > numbers. Re-run against your own corpus before trusting a model for attestation-grade output.
 
-## The rules file
+## Where the rules live
 
-`adr-rules.json` lives in the **governed repo's** git, not here — versioned intent next to the code it
-governs. Each rule-set records the `sourceSha` of the ADR it came from; the gate fails closed when an
-ADR changed without its rules being refreshed, closing the loophole where an edited decision silently
-stops being enforced.
+**tamp-findings is the authoritative store** for rules, results, and scoring ([ADR 0003](docs/adr/0003-findings-system-of-record.md)).
+Generation writes rules to the working tree as a review artifact, then **pushes** them to findings
+(`POST /projects/self/adr-rules`); the gate **fetches** the active set back (`GET /projects/self/adr-ruleset`)
+and runs against it (`ConformanceRunner.CheckFetched`). Each rule carries the `sourceSha` of the ADR it came
+from, so the staleness discipline still holds — an ADR that changed without its rules being regenerated fails
+closed, closing the loophole where an edited decision silently stops being enforced.
+
+## Rule lifecycle & the review gate
+
+A generated rule is a *machine's reading* of an ADR — it doesn't get to enforce anything until a human has
+looked at it. Enforcement is gated on a rule's **review status**, and that status self-heals when the rule
+changes underneath it. The lifecycle is owned by tamp-findings; tamp-conformance drives it by pushing
+generations and forwarding verdicts.
+
+**Draft → Reviewed.** A freshly generated (or regenerated) rule lands **`Draft`**. A Draft rule is
+**advisory**: it still produces verdicts and evidence, but it *never blocks a build and never raises a POA&M*.
+A human promotes a rule to **`Reviewed`** in findings' policy surface. Only a Reviewed rule enforces:
+
+- the **`adrConformance` gate** blocks a build only on a rule that is `Reviewed` **and** failing **and**
+  undispositioned (a semantic fail additionally needs the verify pass to confirm);
+- a **mandate POA&M** is raised only for a `Reviewed` mandate-mapped rule whose verdict is fail/unknown.
+
+So `Draft` = advisory on *both* axes (gate and POA&M tracker); `Reviewed` = enforceable on both. This is the
+human-first gate — a model's extraction can't gate a release until someone signs off on it.
+
+**Regeneration forces re-review.** Push a generation whose rule *content* changed at the same
+`(adrRef, ruleId)` — a different check, intent, or ZT/mandate mapping — and findings forces that rule **back to
+`Draft`**, regardless of the `reviewStatus` the push claims. (Change is detected by the per-rule `rulesSha` the
+client emits, plus a content-field diff for the annotations outside that hash.) An *identical* re-push
+preserves the existing review, so routine re-generation doesn't churn it. The effect: an edited ADR that
+regenerates a rule can't silently keep enforcing the old — or a changed — intent; a human must look again.
+
+**POA&M self-heal (supersession).** When a rule is invalidated — forced to `Draft` by a content change, or
+retired by being absent from a push — any POA&M that rule backed is **auto-cancelled** ("superseded") with an
+audited reason that names the superseding generation, rather than dangling with a due date against a decision
+that no longer holds. Superseded POA&Ms are reported in the push response and surfaced by the client as
+`AdrRulesPushResult.Superseded` (`poamId` / `mandateId` / `reason`). If the mandate still fails under the new
+rule set, a fresh POA&M is raised once the new rule is reviewed.
+
+```text
+  generate ──push──▶ Draft ──human review──▶ Reviewed ──fail verdict──▶ blocks / POA&M
+                       ▲                          │
+                       └──── content change ──────┘   (regeneration forces re-review;
+                            (POA&M auto-cancels,        an identical re-push keeps Reviewed)
+                             audited, in superseded[])
+```
+
+The full loop — amend an ADR → regenerate → the invalidated rule drops to Draft → its block clears and its
+POA&M supersedes, all with an audit trail — is validated end-to-end against a live findings deployment.
 
 ## License
 

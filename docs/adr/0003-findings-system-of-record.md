@@ -36,3 +36,13 @@ The staleness discipline (an ADR changed without its rules being regenerated →
 ## Notes
 
 Companion contracts owned by tamp-findings: the ruleset-serve endpoints, `POST /ingest/conformance`, the compliance-profile read (their ADR 0008), and the shared POA&M + scoring model. The conformance *evidence event* remains core-owned (core ADR 0023); see [ADR 0004](0004-per-project-framework-and-evidence-contract.md).
+
+### Rule lifecycle (review gate + supersession)
+
+"Review moves to findings' policy UI" (above) is realized as an explicit rule lifecycle, owned by findings and driven by this tooling's pushes/verdicts. Validated live end-to-end against a findings deployment.
+
+- **Draft → Reviewed.** A pushed (or regenerated) rule lands `Draft` = advisory (emits verdicts, never blocks, never raises a POA&M). A human promotes it to `Reviewed` in findings; only then does it enforce — the `adrConformance` gate blocks on a `Reviewed` + failing + undispositioned rule, and a mandate POA&M is raised only for a `Reviewed` mandate rule. `Draft`/`Reviewed` gate **both** the block and the POA&M axes identically.
+- **Regeneration forces re-review.** A push whose rule *content* changed at the same `(adrRef, ruleId)` forces that rule back to `Draft` regardless of the pushed `reviewStatus` (detected via the per-rule `rulesSha` this client emits + a content-field diff for annotations outside the hash). An identical re-push preserves review. This keeps an edited/regenerated decision from silently continuing to enforce.
+- **POA&M supersession.** Invalidating a rule (forced `Draft`, or retired) auto-cancels any POA&M it backed, with an audited reason naming the superseding generation; the push response returns these and the client surfaces them as `AdrRulesPushResult.Superseded`. A still-failing mandate re-raises a fresh POA&M once its new rule is reviewed.
+
+The producer's role is: push generations (with a stable per-rule `rulesSha` as the change signal), carry `reviewStatus` on the wire (findings overrides it on content change), forward verdicts (which trigger the mandate reconciler on ingest), and surface `superseded[]`. Everything else — promotion, gating, POA&M raise/cancel, audit — is findings-side. See the README's "Rule lifecycle & the review gate" for the user-facing walkthrough.
