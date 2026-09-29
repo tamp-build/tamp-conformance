@@ -62,6 +62,25 @@ public sealed class FindingsAdrRulesClientTests
     }
 
     [Fact]
+    public void Push_Parses_Superseded_Poams_Including_Unknown_Fields()
+    {
+        // findings TFND-196: a content-changed reviewed rule invalidates a mandate → its POA&M is superseded.
+        var handler = new CapturingHandler("""
+            {"upserted":1,"retired":0,"active":96,
+             "superseded":[{"poamId":"POAM-42","mandateId":"mfa","reason":"rule demo-mandate-mfa forced to Draft (content changed)","priorStatus":"Open","dueDate":"2027-03-28"}]}
+            """);
+        using var http = new HttpClient(handler);
+        var result = new FindingsAdrRulesClient(http).PushGeneration("https://f", "prj_x", "m", new[] { DetRule() });
+
+        var s = Assert.Single(result.Superseded!);
+        Assert.Equal("POAM-42", s.PoamId);
+        Assert.Equal("mfa", s.MandateId);
+        Assert.Contains("Draft", s.Reason);
+        Assert.Equal("Open", s.PriorStatus);
+        Assert.Equal("2027-03-28", s.Extra!["dueDate"].GetString());   // unknown field captured, contract can evolve
+    }
+
+    [Fact]
     public void Fetch_Gets_Active_Set_And_Maps_Back_To_Local_Rules()
     {
         var checkSpec = JsonSerializer.Serialize(new { forbiddenPattern = "OpenTelemetry", scope = new[] { "**/*.csproj" } });
