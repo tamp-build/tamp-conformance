@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <RootNamespace>Tamp.Conformance.Bedrock</RootNamespace>
+    <AssemblyName>Tamp.Conformance.Bedrock</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Package">
+    <PackageId>Tamp.Conformance.Bedrock</PackageId>
+    <Description>AWS Bedrock bring-your-own-key adapter for Tamp.Conformance. A thin IChatCompletion shim over the Bedrock Runtime InvokeModel API for Anthropic (Claude) models, with hand-rolled SigV4 request signing (no AWS SDK dependency). Credentials are read from the standard AWS environment variables and never emitted; the region is configurable. Lets ADR rule extraction and semantic conformance checks run against Claude on Bedrock — including GovCloud regions.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Tamp.Conformance\Tamp.Conformance.csproj" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
+  </ItemGroup>
+
+</Project>

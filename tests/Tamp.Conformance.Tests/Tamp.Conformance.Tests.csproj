@@ -18,6 +18,7 @@
     <ProjectReference Include="..\..\src\Tamp.Conformance\Tamp.Conformance.csproj" />
     <ProjectReference Include="..\..\src\Tamp.Conformance.Anthropic\Tamp.Conformance.Anthropic.csproj" />
     <ProjectReference Include="..\..\src\Tamp.Conformance.OpenAiCompatible\Tamp.Conformance.OpenAiCompatible.csproj" />
+    <ProjectReference Include="..\..\src\Tamp.Conformance.Bedrock\Tamp.Conformance.Bedrock.csproj" />
   </ItemGroup>
 
 </Project>
