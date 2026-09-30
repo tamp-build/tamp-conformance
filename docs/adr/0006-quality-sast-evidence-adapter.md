@@ -46,6 +46,6 @@ findings' work is **TFND-175 expanded** (SonarQube kind + type-routing + quality
 
 * Dedup key is `(normalizedRuleId, file, line)`; provenance is retained per source so double-attributed findings remain traceable.
 * Severity is normalized to a single scale (Blocker / Critical / Major / Minor / Info); ESLint (no native type) maps security-plugin rules ⇒ vulnerability, the rest ⇒ code_smell.
-* Next producer step: **freeze the four emit shapes** (typed findings, scan-ran receipt, quality-gate verdict, analysis-coverage) and hand them to findings for per-endpoint field-name pinning — the same handshake used for the `/raw` endpoints and the signing manifest.
+* Next producer step: **freeze the four emit shapes** (typed findings, scan-ran receipt, quality-gate verdict, analysis-coverage) and hand them to findings for per-endpoint field-name pinning — the same handshake used for the `/raw` endpoints and the signing manifest. Proposed shapes with concrete samples: [quality-adapter-emit-shapes.md](../quality-adapter-emit-shapes.md).
 * Tracking: tamp-conformance epic #16. findings: TFND-175 (expanded) + a new analysis-coverage sub-ticket. Controls: SA-11(1) / SA-15 / CM-3 / CM-4 / SI-2.
 * Cross-refs: [ADR 0003](0003-findings-system-of-record.md) (findings owns transport / verification / scoring), [ADR 0004](0004-per-project-framework-and-evidence-contract.md) (evidence event contract), [ADR 0005](0005-signed-evidence-bundles.md) (the authenticity layer these emissions are signed under; same governing invariant).
