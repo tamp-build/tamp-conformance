@@ -17,8 +17,9 @@ Build identity is reconciled by `commitSha` (findings' `BuildResolver`), exactly
 Endpoint: **existing `POST /ingest/findings`** (`TampIngestClient.PostFindingsAsync`). One request per source scanner; **every finding carries `type`**; findings routes by `type`, and **`type` overrides the scanner→bucket default**.
 
 Producer contract:
-- The adapter **dedups `(ruleId, filePath, line)`** across sources before emit (canonical-source-per-language), so no cross-scanner double count reaches findings.
-- Re-posting a source's findings is **replace-by-source** (idempotent per `(scanner)` within the build).
+- Each source posts as its **own scanner batch, un-cross-deduplicated** — both provenances survive (two tools flagging the same issue is corroboration). Intra-source dedup (e.g. same finding across TFMs) stays producer-side.
+- The producer stamps every finding with **`normalizedRuleId`** (analyzer/repo prefix stripped: `csharpsquid:S2325` and bare `S2325` both → `S2325`). **findings owns cross-source de-duplication**, collapsing on `(file, line, normalizedRuleId)` — mechanical, no tool knowledge needed on their side.
+- Re-posting a source's findings is **replace-by-(build, scanner)**.
 
 Two additions to the current `IngestFinding` (`{ ruleId, title, description, severity, filePath, line, snippet, subCategory }`):
 
@@ -40,6 +41,7 @@ New enum value needed: **`ScannerKind.SonarQube`** (not in Tamp.Ingest.V1 0.2.2 
   "findings": [
     {
       "ruleId": "csharpsquid:S4036",
+      "normalizedRuleId": "S4036",        // tool-agnostic identity; findings collapses cross-source on (file,line,this)
       "type": "vulnerability",            // → SAST (routing key)
       "severity": "Low",                  // MINOR → Low on the 5-scale
       "title": "Use an absolute path for this command.",
