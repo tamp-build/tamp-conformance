@@ -12,6 +12,8 @@ Producers run on many CIs — GitHub Actions, GitLab (cloud + self-hosted), Azur
 
 ## Decision
 
+**Governing invariant — producers generate evidence only; findings owns all policy.** No tool in the conformance tooling renders a pass/fail/allow/deny/gate decision. Every tool (including the ADR-conformance check) resolves / scans / extracts / verifies and emits *facts* — observations, resolved values, four-valued verdicts — stamped with provenance and claimed `controlRefs`, then submits. **All** policy lives in findings: whether a license is allowed, whether a verdict blocks, whether a `(control, toolCode, version)` is acceptable, whether weakened evidence passes a given tier. This keeps producers dumb and auditable and findings the single seat of judgment; the signing scheme below exists to make that evidence *authentic*, never to move judgment into the producer.
+
 **Sign the per-run evidence bundle, once.** The runner assembles an **in-toto v1 Statement** (subject = the build: client/project/commit/version; predicate = an inventory of every evidence item with its `toolCode`, `toolVersion`, `controlRefs`, and the `sha256` of the posted payload) and signs it as a single **DSSE envelope**. One signing operation per build. The signature covers the whole set, so no item can be added, swapped, or dropped undetected; findings recomputes each posted item's digest against the signed manifest.
 
 **Two producer signing modes, auto-selected by environment; `cosign` is the common signer** (a single portable binary, built with PKCS#11 support, that runs on every target CI):
