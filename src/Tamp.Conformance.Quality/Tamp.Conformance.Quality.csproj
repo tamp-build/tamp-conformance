@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <RootNamespace>Tamp.Conformance.Quality</RootNamespace>
+    <AssemblyName>Tamp.Conformance.Quality</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Package">
+    <PackageId>Tamp.Conformance.Quality</PackageId>
+    <Description>Code-quality + SAST evidence adapter for Tamp builds. Normalizes findings from many sources (SonarQube/SonarCloud, Roslyn/SonarAnalyzer, opengrep, ESLint), dedups by (ruleId, file, line), and routes by finding TYPE (bug/code_smell to quality; vulnerability/security_hotspot to SAST). Computes analysis-coverage completeness so "0 findings" cannot mask "never analyzed". Pure evidence — tamp-findings owns all policy (ADR 0006).</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>tamp;conformance;quality;sast;evidence;sonarqube;roslyn;eslint;compliance;fedramp</PackageTags>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
+  </ItemGroup>
+
+</Project>
