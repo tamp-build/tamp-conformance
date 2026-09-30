@@ -127,10 +127,16 @@ public sealed class RoslynSarifSource : IQualitySource
 
     private string Relativize(string uri)
     {
-        var path = uri;
-        if (path.StartsWith("file:///", StringComparison.OrdinalIgnoreCase)) path = path["file:///".Length..];
-        else if (path.StartsWith("file://", StringComparison.OrdinalIgnoreCase)) path = path["file://".Length..];
-        path = Uri.UnescapeDataString(path).Replace('\\', '/');
+        // Parse a file URI to an OS path via the framework — manual "file:///" stripping drops the
+        // leading slash on Unix absolute paths (file:///home/x → home/x), breaking relativization on
+        // Linux/macOS CI. Uri.LocalPath handles both file:///C:/x (Windows) and file:///home/x (Unix).
+        string path;
+        if (uri.StartsWith("file:", StringComparison.OrdinalIgnoreCase) &&
+            Uri.TryCreate(uri, UriKind.Absolute, out var u) && u.IsFile)
+            path = u.LocalPath;
+        else
+            path = Uri.UnescapeDataString(uri);
+        path = path.Replace('\\', '/');
         if (_repoRoot is not null)
         {
             var root = _repoRoot.Replace('\\', '/').TrimEnd('/') + "/";

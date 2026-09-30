@@ -40,8 +40,12 @@ public class SonarConventionsTests
 
 public class RoslynSarifSourceTests
 {
-    // A minimal SARIF: two Sonar rules (a vuln + a code smell) and one non-Sonar rule; three results.
-    private const string Sarif = """
+    // File URIs are built from a real host-OS root so relativization is exercised portably
+    // (Windows drive paths and Unix absolute paths both go through the same code path).
+    private static string Uri3(string root, string rel) =>
+        new Uri(Path.Combine(root, rel.Replace('/', Path.DirectorySeparatorChar))).AbsoluteUri;
+
+    private static string BuildSarif(string root) => $$"""
     {
       "runs": [{
         "tool": { "driver": { "rules": [
@@ -52,13 +56,13 @@ public class RoslynSarifSourceTests
         "results": [
           { "ruleId": "S4036", "ruleIndex": 0, "level": "warning",
             "message": { "text": "Use an absolute path for this command." },
-            "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "file:///C:/repos/tamp/src/Tamp.Core/WorkerIdResolver.cs" }, "region": { "startLine": 74 } } }] },
+            "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "{{Uri3(root, "src/Tamp.Core/WorkerIdResolver.cs")}}" }, "region": { "startLine": 74 } } }] },
           { "ruleId": "S2325", "ruleIndex": 1, "level": "warning",
             "message": { "text": "Make 'Artifacts' a static property." },
-            "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "file:///C:/repos/tamp/build/Build.cs" }, "region": { "startLine": 44 } } }] },
+            "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "{{Uri3(root, "build/Build.cs")}}" }, "region": { "startLine": 44 } } }] },
           { "ruleId": "CA1822", "ruleIndex": 2, "level": "warning",
             "message": { "text": "Member can be static." },
-            "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "file:///C:/repos/tamp/build/Build.cs" }, "region": { "startLine": 10 } } }] }
+            "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "{{Uri3(root, "build/Build.cs")}}" }, "region": { "startLine": 10 } } }] }
         ]
       }]
     }
@@ -74,10 +78,11 @@ public class RoslynSarifSourceTests
     [Fact]
     public void Reads_sonar_findings_with_type_severity_and_relative_path()
     {
-        var path = WriteTemp(Sarif);
+        var root = Path.Combine(Path.GetTempPath(), $"repo-{Guid.NewGuid():N}");
+        var path = WriteTemp(BuildSarif(root));
         try
         {
-            var src = new RoslynSarifSource(new[] { path }, repoRoot: @"C:\repos\tamp");
+            var src = new RoslynSarifSource(new[] { path }, repoRoot: root);
             var findings = src.Read();
 
             // onlySonarRules default → CA1822 (no Sonar type) is dropped.
@@ -100,10 +105,11 @@ public class RoslynSarifSourceTests
     [Fact]
     public void Non_sonar_rules_included_as_code_smell_when_requested()
     {
-        var path = WriteTemp(Sarif);
+        var root = Path.Combine(Path.GetTempPath(), $"repo-{Guid.NewGuid():N}");
+        var path = WriteTemp(BuildSarif(root));
         try
         {
-            var src = new RoslynSarifSource(new[] { path }, repoRoot: @"C:\repos\tamp", onlySonarRules: false);
+            var src = new RoslynSarifSource(new[] { path }, repoRoot: root, onlySonarRules: false);
             var findings = src.Read();
             Assert.Equal(3, findings.Count);
             var ca = Assert.Single(findings, f => f.RuleId == "CA1822");
