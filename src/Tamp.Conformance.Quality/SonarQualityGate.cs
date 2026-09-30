@@ -2,7 +2,11 @@ using System.Text.Json;
 
 namespace Tamp.Conformance.Quality;
 
-/// <summary>One condition of a quality gate, as the source evaluated it.</summary>
+/// <summary>
+/// One condition of a quality gate, as the source evaluated it. <see cref="Status"/> is the source's
+/// RAW level (e.g. Sonar "OK" / "ERROR" / "WARN"), preserved verbatim for the evidence panel — the
+/// overall <see cref="QualityGateVerdict.Status"/> is the mapped pass/fail/warn.
+/// </summary>
 public sealed record GateCondition(string Metric, string Op, string Threshold, string Actual, string Status);
 
 /// <summary>
@@ -77,19 +81,11 @@ public static class SonarQualityGate
                     Op: Str(c, "op") ?? "",
                     Threshold: Str(c, "error") ?? "",
                     Actual: Str(c, "actual") ?? "",
-                    Status: MapConditionLevel(Str(c, "level"))));
+                    Status: (Str(c, "level") ?? "").ToUpperInvariant())); // raw Sonar level, verbatim
             }
         }
         return list;
     }
-
-    private static string MapConditionLevel(string? level) => (level ?? "").ToUpperInvariant() switch
-    {
-        "OK" => "pass",
-        "ERROR" => "fail",
-        "WARN" => "warn",
-        _ => "unknown",
-    };
 
     private static string? Str(JsonElement e, string prop) =>
         e.TryGetProperty(prop, out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() : null;

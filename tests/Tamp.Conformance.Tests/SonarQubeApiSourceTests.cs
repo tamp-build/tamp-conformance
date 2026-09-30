@@ -96,7 +96,7 @@ public class SonarQualityGateTests
         Assert.Equal("sonarqube", v.Source);
         Assert.Equal("AY9abc", v.AnalysisId);
 
-        var failing = Assert.Single(v.Conditions, c => c.Status == "fail");
+        var failing = Assert.Single(v.Conditions, c => c.Status == "ERROR"); // raw Sonar level, verbatim
         Assert.Equal("new_reliability_rating", failing.Metric);
         Assert.Equal("GT", failing.Op);
         Assert.Equal("1", failing.Threshold);
