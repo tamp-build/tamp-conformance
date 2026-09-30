@@ -36,6 +36,16 @@ public class SonarConventionsTests
     {
         Assert.Equal(bucket, Routing.BucketFor(type));
     }
+
+    [Theory]
+    [InlineData("csharpsquid:S2325", "S2325")]   // SonarQube C# ≡ local SonarAnalyzer
+    [InlineData("S2325", "S2325")]               // local SonarAnalyzer SARIF (bare)
+    [InlineData("githubactions:S8233", "S8233")] // other Sonar repo (no Roslyn twin; different file so no false match)
+    [InlineData("CA1822", "CA1822")]             // no prefix
+    public void NormalizeRuleId_strips_analyzer_prefix(string ruleId, string expected)
+    {
+        Assert.Equal(expected, Routing.NormalizeRuleId(ruleId));
+    }
 }
 
 public class RoslynSarifSourceTests

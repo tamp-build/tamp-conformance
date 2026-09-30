@@ -37,6 +37,7 @@ public static class QualityEmit
         body["findings"] = findings.Select(f => new Dictionary<string, object?>
         {
             ["ruleId"] = f.RuleId,
+            ["normalizedRuleId"] = f.NormalizedRuleId,   // tool-agnostic identity; findings collapses on (file,line,this)
             ["type"] = Routing.ToWire(f.Type),
             ["severity"] = f.Severity.ToString(),           // 5-scale, e.g. "Medium"
             ["title"] = f.Title,

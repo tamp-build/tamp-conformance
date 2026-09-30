@@ -67,6 +67,15 @@ public sealed record NormalizedFinding(
 {
     /// <summary>The report this finding routes into, derived from <see cref="Type"/>.</summary>
     public QualityBucket Bucket => Routing.BucketFor(Type);
+
+    /// <summary>
+    /// The tool-agnostic rule identity used for cross-source equivalence — the bare rule number with any
+    /// analyzer/repository prefix stripped (SonarQube's <c>csharpsquid:S2325</c> and local SonarAnalyzer's
+    /// <c>S2325</c> both normalize to <c>S2325</c>). The producer computes this because only it knows the
+    /// tools ran; findings collapses cross-source duplicates mechanically on (file, line, normalizedRuleId)
+    /// without needing any tool knowledge.
+    /// </summary>
+    public string NormalizedRuleId => Routing.NormalizeRuleId(RuleId);
 }
 
 /// <summary>The one place that maps finding type → report bucket. Type wins over scanner, always.</summary>
@@ -79,6 +88,18 @@ public static class Routing
         FindingType.Vulnerability or FindingType.SecurityHotspot => QualityBucket.Sast,
         _ => QualityBucket.Quality,
     };
+
+    /// <summary>
+    /// Strip an analyzer/repository prefix from a rule id to get its tool-agnostic identity:
+    /// <c>csharpsquid:S2325</c> → <c>S2325</c>, <c>S2325</c> → <c>S2325</c>. Cross-source dedupe keys on
+    /// this plus (file, line); language prefixes differ by file so bare-number collisions never false-match.
+    /// </summary>
+    public static string NormalizeRuleId(string ruleId)
+    {
+        if (string.IsNullOrEmpty(ruleId)) return ruleId;
+        var i = ruleId.IndexOf(':');
+        return i >= 0 && i < ruleId.Length - 1 ? ruleId[(i + 1)..] : ruleId;
+    }
 
     /// <summary>Wire string for a finding type, as posted to findings (lower_snake_case, matches SonarQube).</summary>
     public static string ToWire(FindingType type) => type switch

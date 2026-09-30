@@ -26,6 +26,7 @@ public class QualityEmitTests
 
         var finding = root.GetProperty("findings")[0];
         Assert.Equal("csharpsquid:S4036", finding.GetProperty("ruleId").GetString());
+        Assert.Equal("S4036", finding.GetProperty("normalizedRuleId").GetString()); // prefix stripped for cross-source collapse
         Assert.Equal("vulnerability", finding.GetProperty("type").GetString());   // wire vocab
         Assert.Equal("Low", finding.GetProperty("severity").GetString());          // 5-scale
         Assert.Equal(74, finding.GetProperty("line").GetInt32());
