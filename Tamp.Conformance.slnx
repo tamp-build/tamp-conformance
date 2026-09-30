@@ -13,6 +13,7 @@
     <Project Path="src/Tamp.Conformance.Anthropic/Tamp.Conformance.Anthropic.csproj" />
     <Project Path="src/Tamp.Conformance.OpenAiCompatible/Tamp.Conformance.OpenAiCompatible.csproj" />
     <Project Path="src/Tamp.Conformance.Bedrock/Tamp.Conformance.Bedrock.csproj" />
+    <Project Path="src/Tamp.Conformance.Quality/Tamp.Conformance.Quality.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Tamp.Conformance.Tests/Tamp.Conformance.Tests.csproj" />
