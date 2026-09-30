@@ -1,6 +1,6 @@
 # ADR 0005: Signed evidence bundles — portable, per-run provenance
 
-* Status: Accepted
+* Status: Draft (contract pinned with findings; held in draft until Tier-1 signing + findings' build-level endpoint land, in case implementation forces edits)
 * Date: 2026-09-30
 * Deciders: scott
 
