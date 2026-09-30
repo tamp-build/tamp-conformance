@@ -8,3 +8,4 @@ Records of the consequential, hard-to-reverse decisions behind tamp-conformance 
 | [0002](0002-byok-model-provider-seam.md) | Bring-your-own-key model provider seam + adapter packages | Accepted |
 | [0003](0003-findings-system-of-record.md) | tamp-findings is the system of record; the tooling is analysis-only | Accepted |
 | [0004](0004-per-project-framework-and-evidence-contract.md) | Per-project framework + the conformance evidence contract | Accepted |
+| [0005](0005-signed-evidence-bundles.md) | Signed evidence bundles — portable, per-run provenance (keyless / KMS / PKCS#11, CA-chain default) | Accepted |
