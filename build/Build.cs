@@ -1,8 +1,12 @@
 using Tamp;
 using Tamp.NetCli.V10;
+using Tamp.Components;
+using Tamp.Components.NetCli.V10;
 using Tamp.Telegram;
 
-class Build : TampBuild
+// Restore / Compile / Test / Pack come from Tamp.Components (IDotNetTest + IDotNetPack); the build
+// supplies the IHaz* values and keeps its own Info / Clean / Push / Ci. See ADR 0020.
+class Build : TampBuild, IDotNetTest, IDotNetPack
 {
     public static int Main(string[] args) => Execute<Build>(args);
 
@@ -12,21 +16,20 @@ class Build : TampBuild
     [BuildReporter] readonly IBuildReporter? TelegramNotify =
         TelegramBuildReporter.FromEnvironment();
 
+    // Settable property: [Parameter] binds into the setter; the getter satisfies IHazConfiguration.
     [Parameter("Build configuration")]
-    Configuration Configuration = IsLocalBuild ? Configuration.Debug : Configuration.Release;
+    public Configuration Configuration { get; set; } = IsLocalBuild ? Configuration.Debug : Configuration.Release;
 
-    [Parameter("Package version override", EnvironmentVariable = "PACKAGE_VERSION")]
-#pragma warning disable CS0649
-    readonly string? Version;
-#pragma warning restore CS0649
+    // Settable property: [Solution] injects into the setter; the getter satisfies IHazSolution.
+    [Solution] public Solution Solution { get; set; } = null!;
 
-    [Solution] readonly Solution Solution = null!;
     [GitRepository] readonly GitRepository Git = null!;
 
     [Secret("NuGet API key", EnvironmentVariable = "NUGET_API_KEY")]
     readonly Secret NuGetApiKey = null!;
 
-    AbsolutePath Artifacts => RootDirectory / "artifacts";
+    // Satisfies IHazArtifacts. (The component Pack reads PACKAGE_VERSION itself, so no Version param here.)
+    public AbsolutePath ArtifactsDirectory => RootDirectory / "artifacts";
 
     Target Info => _ => _.Executes(() =>
     {
@@ -39,49 +42,19 @@ class Build : TampBuild
         .Description("Delete bin/obj and the artifacts directory.")
         .Executes(() => CleanArtifacts());
 
-    Target Restore => _ => _.Executes(() => DotNet.Restore(s => s.SetProject(Solution.Path)));
-
-    Target Compile => _ => _
-        .DependsOn(nameof(Restore))
-        .Executes(() => DotNet.Build(s => s
-            .SetProject(Solution.Path)
-            .SetConfiguration(Configuration)
-            .SetNoRestore(true)));
-
-    Target Test => _ => _
-        .DependsOn(nameof(Compile))
-        .Executes(() => DotNet.Test(s => s
-            .SetProject(RootDirectory / "tests" / "Tamp.Conformance.Tests" / "Tamp.Conformance.Tests.csproj")
-            .SetConfiguration(Configuration)
-            .SetNoBuild(true)
-            .AddLogger("trx;LogFileName=test-results.trx")
-            .AddDataCollector("XPlat Code Coverage")
-            .SetSettings((RootDirectory / "build" / "coverlet.runsettings").Value)
-            .SetResultsDirectory(Artifacts / "test-results")));
-
-    Target Pack => _ => _
-        .DependsOn(nameof(Test))
-        .Executes(() => DotNet.Pack(s =>
-        {
-            s.SetProject(RootDirectory / "src" / "Tamp.Conformance" / "Tamp.Conformance.csproj");
-            s.SetConfiguration(Configuration);
-            s.SetNoBuild(true);
-            s.SetOutput(Artifacts);
-            if (!string.IsNullOrEmpty(Version)) s.SetProperty("Version", Version);
-        }));
-
     Target Push => _ => _
-        .DependsOn(nameof(Pack))
+        .DependsOn(nameof(IPack.Pack))
         .Requires(() => NuGetApiKey != null)
-        .Executes(() => Artifacts.GlobFiles("*.nupkg")
+        .Executes(() => ArtifactsDirectory.GlobFiles("*.nupkg")
             .Select(p => DotNet.NuGetPush(s => s
                 .SetPackagePath(p)
                 .SetSource("https://api.nuget.org/v3/index.json")
                 .SetApiKey(NuGetApiKey)
                 .SetSkipDuplicate(true))));
 
+    // Component Pack depends on Compile, NOT Test (they are parallel-safe siblings), so Ci must name both.
     Target Ci => _ => _
-        .DependsOn(nameof(Info), nameof(Clean), nameof(Pack));
+        .DependsOn(nameof(Info), nameof(Clean), nameof(ITest.Test), nameof(IPack.Pack));
 
-    Target Default => _ => _.DependsOn(nameof(Compile));
+    Target Default => _ => _.DependsOn(nameof(ICompile.Compile));
 }
