@@ -36,10 +36,35 @@ public sealed class LlmRuleExtractor : IRuleExtractor
         - "semantic": a genuine architectural judgement no regex can settle (e.g. "the UI is native, not
           a web app"). Give only "claim" (and optional "scope"/"controlRefs"); no patterns.
 
-        Rules:
-        - Prefer deterministic. Use semantic ONLY when no regex could decide it.
-        - ABSTAIN: if a consequence cannot be made into a sound, low-false-positive rule, DO NOT emit it.
-          Emitting nothing is correct; inventing a shaky rule is not.
+        Classification order — deterministic is NOT the default, ROBUSTNESS is:
+        1. Emit "deterministic" ONLY when a robust, low-false-positive regex exists (see below).
+        2. Otherwise emit "semantic" — a brittle regex that an idiomatic rewrite would defeat is WORSE
+           than a semantic rule, because it fails compliant code and trains people to ignore the gate.
+        3. If neither is sound, ABSTAIN — emit nothing. Emitting nothing is correct; a shaky rule is not.
+
+        Writing a ROBUST deterministic pattern (a pattern is a REGEX over source text — NEVER an English
+        sentence or paraphrase; "requiredPattern":"beacon still on legacy emitter" is INVALID):
+        - Anchor on the LOWEST-VARIANCE token that proves the claim — a string literal, a type/attribute/
+          package name, an interface name. Do NOT match whole statements whose incidental syntax varies.
+        - Account for how the language actually writes the thing, or your required-pattern will miss
+          compliant code. In C#, the SAME construct has many spellings: target-typed `new("X")` vs
+          `new Type("X")` vs fully-qualified `new Ns.Type("X")`; a class reaching a base through an
+          INTERMEDIATE base (`class B : Mid` where `Mid : Base`) so a literal `: Base` is absent; `using`
+          imports making a type unqualified; arbitrary whitespace/newlines. Prefer the invariant: to prove
+          "declares an ActivitySource named Tamp.Build", require the literal "Tamp.Build" in scope — NOT
+          `new\s+ActivitySource`. To prove "is a Tamp build", a `: Base` regex is fragile across
+          intermediate bases — prefer semantic.
+        - SCOPE precisely. Exclude build scripts, generated code, and build output unless the rule is about
+          them: a rule about SHIPPED assemblies scopes to ["src/**/*.csproj"], not ["**/*.csproj"] (which
+          would wrongly flag build/ and test projects). Default-exclude **/bin/**, **/obj/**, and build/**.
+        - A requiredPattern must hold in THIS repo. A repo that DEFINES an artifact is not a CONSUMER of it
+          (the repo that produces Tamp.Core has no PackageReference to Tamp.Core) — if the constraint only
+          applies to downstream consumers, scope it out or make it semantic; do not require a self-dependency.
+        - Only emit a rule for what is already TRUE of conforming code. Do NOT emit deterministic rules for
+          aspirational/forward-looking consequences (a marker a future migration will add) — abstain or mark
+          semantic, so unstarted work is not a standing failure.
+
+        General:
         - "id": "<adr>-r<n>" (e.g. "0018-r1"). "claim": a short quote/paraphrase of the ADR text.
         """;
 

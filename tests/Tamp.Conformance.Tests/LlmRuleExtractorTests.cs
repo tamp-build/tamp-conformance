@@ -74,6 +74,28 @@ public sealed class LlmRuleExtractorTests
     }
 
     [Fact]
+    public void System_Prompt_Carries_The_Robustness_Guidance()
+    {
+        // Regression guard for the anti-brittleness spine (the fix for tamp-core's 10 rule-quality
+        // conformance fails: over-literal regexes, wrong scope, prose-as-pattern, aspirational markers).
+        var prompt = new LlmRuleExtractor(new FakeModel("{\"rules\":[]}")).BuildSystemPrompt();
+
+        // Deterministic is gated on robustness, not the default.
+        Assert.Contains("ROBUSTNESS", prompt);
+        // Patterns are regexes, never English prose.
+        Assert.Contains("NEVER an English", prompt);
+        // Account for C# idiom variance (target-typed new, intermediate bases).
+        Assert.Contains("target-typed", prompt);
+        Assert.Contains("INTERMEDIATE base", prompt);
+        // Scope precisely / exclude build+generated.
+        Assert.Contains("src/**", prompt);
+        // Defining repo is not a consumer.
+        Assert.Contains("not a CONSUMER", prompt);
+        // No aspirational/forward-looking deterministic rules.
+        Assert.Contains("aspirational", prompt);
+    }
+
+    [Fact]
     public void Extracted_Rules_Feed_Straight_Into_A_RuleSet()
     {
         var rules = new LlmRuleExtractor(new FakeModel(GoodJson)).Extract("0018", "x");
