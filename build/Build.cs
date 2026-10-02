@@ -56,6 +56,11 @@ class Build : TampBuild, IDotNetTest, IDotNetPack
     [Parameter("SonarCloud project key")]
     readonly string SonarProjectKey = "tamp-build_tamp-conformance";
 
+    // PR-decoration inputs (set by ci.yml on pull_request events; empty on branch runs → branch analysis).
+    [Parameter("Pull-request number", EnvironmentVariable = "SONAR_PR_KEY")] readonly string SonarPrKey = "";
+    [Parameter("Pull-request head branch", EnvironmentVariable = "SONAR_PR_BRANCH")] readonly string SonarPrBranch = "";
+    [Parameter("Pull-request base branch", EnvironmentVariable = "SONAR_PR_BASE")] readonly string SonarPrBase = "";
+
     Target Info => _ => _.Executes(() =>
     {
         Console.WriteLine($"  Branch:        {Git.Branch ?? "<detached>"}");
@@ -87,14 +92,23 @@ class Build : TampBuild, IDotNetTest, IDotNetPack
         .Description("Initialize the SonarCloud pre-build phase.")
         .Before(nameof(ICompile.Compile))
         .Requires(() => SonarToken != null)
-        .Executes(() => SonarScanner.Begin(SonarTool, s => s
-            .SetProjectKey(SonarProjectKey)
-            .SetOrganization(SonarOrganization)
-            .SetHostUrl(SonarHostUrl)
-            .SetToken(SonarToken)
-            // The build script is build tooling, not shipped product code.
-            .SetProperty("sonar.exclusions", "build/**")
-            .SetProperty("sonar.cs.opencover.reportsPaths", $"{TestResultsDir.Value}/**/coverage.opencover.xml")));
+        .Executes(() => SonarScanner.Begin(SonarTool, s =>
+        {
+            s.SetProjectKey(SonarProjectKey)
+             .SetOrganization(SonarOrganization)
+             .SetHostUrl(SonarHostUrl)
+             .SetToken(SonarToken)
+             // The build script is build tooling, not shipped product code.
+             .SetProperty("sonar.exclusions", "build/**")
+             .SetProperty("sonar.cs.opencover.reportsPaths", $"{TestResultsDir.Value}/**/coverage.opencover.xml");
+
+            // On a PR run, analyze as a pull request so SonarCloud decorates the PR with the
+            // new-code quality gate (instead of polluting the main branch). Branch runs omit these.
+            if (!string.IsNullOrEmpty(SonarPrKey))
+                s.SetProperty("sonar.pullrequest.key", SonarPrKey)
+                 .SetProperty("sonar.pullrequest.branch", SonarPrBranch)
+                 .SetProperty("sonar.pullrequest.base", SonarPrBase);
+        }));
 
     Target SonarEnd => _ => _
         .After(nameof(ITest.Test))
