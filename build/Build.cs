@@ -2,6 +2,7 @@ using Tamp;
 using Tamp.NetCli.V10;
 using Tamp.Components;
 using Tamp.Components.NetCli.V10;
+using Tamp.SonarScanner.V10;
 using Tamp.Telegram;
 
 // Restore / Compile / Test / Pack come from Tamp.Components (IDotNetTest + IDotNetPack); the build
@@ -31,6 +32,30 @@ class Build : TampBuild, IDotNetTest, IDotNetPack
     // Satisfies IHazArtifacts. (The component Pack reads PACKAGE_VERSION itself, so no Version param here.)
     public AbsolutePath ArtifactsDirectory => RootDirectory / "artifacts";
 
+    // The component Test (IDotNetTest) writes coverage under artifacts/test-results; build/coverlet.runsettings
+    // makes it OpenCover, which SonarCloud's sonar.cs.opencover.reportsPaths ingests.
+    AbsolutePath TestResultsDir => ArtifactsDirectory / "test-results";
+
+    // ----- SonarCloud (SonarQube Cloud) -----
+    //
+    // dotnet-sonarscanner is a DLL-based .NET tool; CI installs it globally
+    // (`dotnet tool install --global dotnet-sonarscanner`) and resolves the apphost from PATH.
+    // Optional so the fast CI lane (which never runs Sonar) doesn't require it to be installed.
+    [FromPath("dotnet-sonarscanner", Optional = true)]
+    readonly Tool SonarTool = null!;
+
+    [Secret("SonarCloud token", EnvironmentVariable = "SONAR_TOKEN")]
+    readonly Secret SonarToken = null!;
+
+    [Parameter("Sonar host URL", EnvironmentVariable = "SONAR_HOST_URL")]
+    readonly string SonarHostUrl = "https://sonarcloud.io";
+
+    [Parameter("SonarCloud organization")]
+    readonly string SonarOrganization = "tamp-build";
+
+    [Parameter("SonarCloud project key")]
+    readonly string SonarProjectKey = "tamp-build_tamp-conformance";
+
     Target Info => _ => _.Executes(() =>
     {
         Console.WriteLine($"  Branch:        {Git.Branch ?? "<detached>"}");
@@ -55,6 +80,31 @@ class Build : TampBuild, IDotNetTest, IDotNetPack
     // Component Pack depends on Compile, NOT Test (they are parallel-safe siblings), so Ci must name both.
     Target Ci => _ => _
         .DependsOn(nameof(Info), nameof(Clean), nameof(ITest.Test), nameof(IPack.Pack));
+
+    // SonarCloud analysis is a two-phase scan: Begin before the build, End after tests, with the
+    // component Compile + Test running between so the scanner collects MSBuild inputs and coverage.
+    Target SonarBegin => _ => _
+        .Description("Initialize the SonarCloud pre-build phase.")
+        .Before(nameof(ICompile.Compile))
+        .Requires(() => SonarToken != null)
+        .Executes(() => SonarScanner.Begin(SonarTool, s => s
+            .SetProjectKey(SonarProjectKey)
+            .SetOrganization(SonarOrganization)
+            .SetHostUrl(SonarHostUrl)
+            .SetToken(SonarToken)
+            // The build script is build tooling, not shipped product code.
+            .SetProperty("sonar.exclusions", "build/**")
+            .SetProperty("sonar.cs.opencover.reportsPaths", $"{TestResultsDir.Value}/**/coverage.opencover.xml")));
+
+    Target SonarEnd => _ => _
+        .After(nameof(ITest.Test))
+        .DependsOn(nameof(SonarBegin))
+        .Description("Finalize SonarCloud and submit results.")
+        .Executes(() => SonarScanner.End(SonarTool, s => s.SetToken(SonarToken)));
+
+    Target Sonar => _ => _
+        .DependsOn(nameof(SonarBegin), nameof(ITest.Test), nameof(SonarEnd))
+        .Description("Full SonarCloud analysis: begin, build + test coverage (all TFMs), end. Requires SONAR_TOKEN.");
 
     Target Default => _ => _.DependsOn(nameof(ICompile.Compile));
 }
