@@ -19,6 +19,9 @@ jobs:
       DOTNET_NOLOGO: '1'
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+      # Use the published Tamp.Core package, not the sibling-clone ProjectReference (which isn't
+      # present in CI). Matches ci.yml; without it the build defaults to TampCoreMode=project and fails.
+      TampCoreMode: package
 
     steps:
       - name: Checkout
