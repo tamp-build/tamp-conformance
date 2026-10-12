@@ -38,7 +38,9 @@ public sealed class BedrockChat : IChatCompletion, IDisposable
     /// <summary>Frozen into <c>Provenance.ModelId</c>, e.g. <c>bedrock/anthropic.claude-3-5-sonnet-20240620-v1:0</c>.</summary>
     public string ModelId => $"bedrock/{_config.ModelId}";
 
-    public string Complete(string system, string user)
+    public string Complete(string system, string user) => CompleteWithUsage(system, user).Text;
+
+    public ChatResult CompleteWithUsage(string system, string user)
     {
         var body = JsonSerializer.SerializeToUtf8Bytes(new InvokeRequest
         {
@@ -76,7 +78,8 @@ public sealed class BedrockChat : IChatCompletion, IDisposable
             if (block.Type == "text" && block.Text is not null)
                 sb.Append(block.Text);
         }
-        return sb.ToString();
+        var usage = parsed.Usage is { } u ? new ModelUsage(u.InputTokens, u.OutputTokens) : ModelUsage.None;
+        return new ChatResult(sb.ToString(), usage);
     }
 
     /// <summary>
@@ -134,6 +137,13 @@ public sealed class BedrockChat : IChatCompletion, IDisposable
     private sealed record InvokeResponse
     {
         public IReadOnlyList<ContentBlock>? Content { get; init; }
+        public UsageInfo? Usage { get; init; }
+    }
+
+    private sealed record UsageInfo
+    {
+        public long InputTokens { get; init; }
+        public long OutputTokens { get; init; }
     }
 
     private sealed record ContentBlock
