@@ -6,7 +6,8 @@ namespace Tamp.Conformance.Quality;
 /// Reads SonarAnalyzer (and general Roslyn) SARIF logs — the per-project <c>*.sarif</c> the
 /// <c>SecurityScanRoslyn</c> target emits — and normalizes them. A finding's type + severity come
 /// from the SARIF rule's <c>properties.category</c> ("&lt;Severity&gt; &lt;Type&gt;", e.g. "Minor Code Smell"),
-/// which the result references by <c>ruleIndex</c> into <c>tool.driver.rules[]</c>.
+/// which the result references by <c>ruleIndex</c> into <c>tool.driver.rules[]</c>. SARIF primitives are
+/// shared via <see cref="SarifReadHelpers"/>.
 /// </summary>
 public sealed class RoslynSarifSource : IQualitySource
 {
@@ -61,9 +62,9 @@ public sealed class RoslynSarifSource : IQualitySource
         {
             foreach (var r in ruleArr.EnumerateArray())
             {
-                var id = Str(r, "id") ?? "";
+                var id = SarifReadHelpers.Str(r, "id") ?? "";
                 string? category = null;
-                if (r.TryGetProperty("properties", out var rp)) category = Str(rp, "category");
+                if (r.TryGetProperty("properties", out var rp)) category = SarifReadHelpers.Str(rp, "category");
                 rules.Add((id, category));
                 if (id.Length > 0) byId[id] = category;
             }
@@ -72,7 +73,7 @@ public sealed class RoslynSarifSource : IQualitySource
         if (!run.TryGetProperty("results", out var results) || results.ValueKind != JsonValueKind.Array) return;
         foreach (var res in results.EnumerateArray())
         {
-            var ruleId = Str(res, "ruleId") ?? "";
+            var ruleId = SarifReadHelpers.Str(res, "ruleId") ?? "";
             // Prefer ruleIndex; fall back to id lookup.
             string? category = null;
             if (res.TryGetProperty("ruleIndex", out var ri) && ri.TryGetInt32(out var idx) && idx >= 0 && idx < rules.Count)
@@ -89,18 +90,18 @@ public sealed class RoslynSarifSource : IQualitySource
             {
                 if (_onlySonarRules) continue;
                 type = FindingType.CodeSmell;
-                severity = LevelToSeverity(Str(res, "level"));
+                severity = LevelToSeverity(SarifReadHelpers.Str(res, "level"));
             }
 
-            var (file, line) = Location(res);
+            var (file, line) = SarifReadHelpers.Location(res, _repoRoot);
             if (file is null) continue;
 
-            var message = Message(res);
+            var message = SarifReadHelpers.Message(res);
             into.Add(new NormalizedFinding(
                 RuleId: ruleId,
                 Type: type,
                 Severity: severity,
-                Title: FirstLine(message),
+                Title: SarifReadHelpers.FirstLine(message),
                 FilePath: file,
                 Line: line,
                 Description: message,
@@ -110,42 +111,6 @@ public sealed class RoslynSarifSource : IQualitySource
         }
     }
 
-    private (string? File, int? Line) Location(JsonElement res)
-    {
-        if (!res.TryGetProperty("locations", out var locs) || locs.ValueKind != JsonValueKind.Array) return (null, null);
-        foreach (var loc in locs.EnumerateArray())
-        {
-            if (!loc.TryGetProperty("physicalLocation", out var pl)) continue;
-            string? uri = pl.TryGetProperty("artifactLocation", out var al) ? Str(al, "uri") : null;
-            if (uri is null) continue;
-            int? line = null;
-            if (pl.TryGetProperty("region", out var region) && region.TryGetProperty("startLine", out var sl) && sl.TryGetInt32(out var l)) line = l;
-            return (Relativize(uri), line);
-        }
-        return (null, null);
-    }
-
-    private string Relativize(string uri)
-    {
-        // Parse a file URI to an OS path via the framework — manual "file:///" stripping drops the
-        // leading slash on Unix absolute paths (file:///home/x → home/x), breaking relativization on
-        // Linux/macOS CI. Uri.LocalPath handles both file:///C:/x (Windows) and file:///home/x (Unix).
-        string path;
-        if (uri.StartsWith("file:", StringComparison.OrdinalIgnoreCase) &&
-            Uri.TryCreate(uri, UriKind.Absolute, out var u) && u.IsFile)
-            path = u.LocalPath;
-        else
-            path = Uri.UnescapeDataString(uri);
-        path = path.Replace('\\', '/');
-        if (_repoRoot is not null)
-        {
-            var root = _repoRoot.Replace('\\', '/').TrimEnd('/') + "/";
-            if (path.StartsWith(root, StringComparison.OrdinalIgnoreCase))
-                path = path[root.Length..];
-        }
-        return path;
-    }
-
     private static NormalizedSeverity LevelToSeverity(string? level) => (level ?? "").ToLowerInvariant() switch
     {
         "error" => NormalizedSeverity.High,
@@ -153,16 +118,4 @@ public sealed class RoslynSarifSource : IQualitySource
         "note" => NormalizedSeverity.Low,
         _ => NormalizedSeverity.Info,
     };
-
-    private static string Message(JsonElement res) =>
-        res.TryGetProperty("message", out var m) && m.TryGetProperty("text", out var t) ? (t.GetString() ?? "") : "";
-
-    private static string FirstLine(string s)
-    {
-        var i = s.IndexOf('\n');
-        return (i < 0 ? s : s[..i]).Trim();
-    }
-
-    private static string? Str(JsonElement e, string prop) =>
-        e.TryGetProperty(prop, out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() : null;
 }
