@@ -6,6 +6,16 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-10-12
+
+### Added
+
+- **Evidence-signing seam (`Tamp.Conformance.Signing`)** — first increment of the signed-evidence-bundles epic ([#15](https://github.com/tamp-build/tamp-conformance/issues/15), ADR 0005). `IEvidenceSigner` with `NullSigner` (unsigned), `CosignManagedKeySigner` (Tier-1 managed-key / CA-chain via a KMS or `pkcs11:` key reference), and `KeylessOidcSigner` (Tier-2 GHA/GitLab.com keyless). `EvidenceSignerFactory.Detect(env)` auto-selects from the environment (explicit `TAMP_SIGN_KEY` key-ref → managed; ambient OIDC → keyless; otherwise **NullSigner**).
+- **Per-run manifest model** — `EvidenceItem` (axis / artifactId / sha256 + the `toolCode`+`toolVersion`+`controlRefs` provenance stamp) and `EvidenceManifest`, which renders a deterministic **in-toto v1 Statement** (subject = commit SHA) for DSSE signing, plus `DsseEnvelope` types and SHA-256 helpers.
+- **Signing is optional by construction** — `EvidenceSignerFactory.SignSafelyAsync` never throws: on an agent that can't sign (local/dev, un-wired CI, missing cosign, KMS/OIDC fault) it returns `null` and the run still posts its evidence **unsigned** (weakened). Whether unsigned evidence is acceptable is findings' policy-tier decision, not the producer's.
+
+> Scope: seam + model + detection only. Wiring signing into the findings-ingest POST, the exact cosign/DSSE wire format, and per-CI reference setups are deferred until findings' build-level verify endpoint (TFND-210) lands; `CosignSignerBase.BuildSignArgs` is the single tested surface to pin then. Not yet posted anywhere, so no behavior change to existing evidence flow.
+
 ### Added
 
 - **`superseded[]` on the adr-rules push result (`AdrRulesPushResult.Superseded`).** When a generation push invalidates a reviewed rule (findings TFND-196 forces content-changed rules back to Draft), any POA&M that rule backed is auto-cancelled and reported in the push response. The client now surfaces these as `SupersededPoam` records (`poamId`/`mandateId`/`reason`, plus a `JsonExtensionData` catch-all so the contract can evolve). Validated live end-to-end: raised an `mfa` mandate POA&M, then a checkSpec change cancelled it and returned it in `superseded[]` with an audited reason.
