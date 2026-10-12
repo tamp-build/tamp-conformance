@@ -49,7 +49,9 @@ public sealed class OpenAiCompatibleChat : IChatCompletion, IDisposable
 
     public string ModelId => $"{_providerLabel}/{_config.ModelId}";
 
-    public string Complete(string system, string user)
+    public string Complete(string system, string user) => CompleteWithUsage(system, user).Text;
+
+    public ChatResult CompleteWithUsage(string system, string user)
     {
         var body = JsonSerializer.Serialize(new ChatRequest
         {
@@ -81,7 +83,9 @@ public sealed class OpenAiCompatibleChat : IChatCompletion, IDisposable
         if (parsed.Choices is { Count: > 0 } && parsed.Choices[0].FinishReason == "length")
             throw new FormatException(
                 $"Model response was truncated at max_tokens ({_config.MaxTokens}); the output is incomplete. Raise ModelConfig.MaxTokens (or the server's context window).");
-        return parsed.Choices is { Count: > 0 } ? parsed.Choices[0].Message?.Content ?? "" : "";
+        var text = parsed.Choices is { Count: > 0 } ? parsed.Choices[0].Message?.Content ?? "" : "";
+        var usage = parsed.Usage is { } u ? new ModelUsage(u.PromptTokens, u.CompletionTokens) : ModelUsage.None;
+        return new ChatResult(text, usage);
     }
 
     /// <summary>Build a client, resolving the key from <c>CONFORMANCE_MODEL_API_KEY</c> then <c>OPENAI_API_KEY</c>.</summary>
@@ -124,6 +128,13 @@ public sealed class OpenAiCompatibleChat : IChatCompletion, IDisposable
     private sealed record ChatResponse
     {
         public IReadOnlyList<Choice>? Choices { get; init; }
+        public UsageInfo? Usage { get; init; }
+    }
+
+    private sealed record UsageInfo
+    {
+        public long PromptTokens { get; init; }
+        public long CompletionTokens { get; init; }
     }
 
     private sealed record Choice

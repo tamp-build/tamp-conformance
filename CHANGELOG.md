@@ -6,6 +6,15 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-10-12
+
+### Added
+
+- **`OpenGrepSarifSource`** (#16) — a pluggable `IQualitySource` that reads opengrep SARIF and normalizes it into the SAST bucket (`FindingType.Vulnerability`), with severity from the rule's `security-severity` (CVSS) and a `level` fallback. Routing stays type-driven, so it dedups/aggregates alongside the SonarQube + Roslyn sources.
+- **Token-usage capture at the model seam** (#12) — `IChatCompletion.CompleteWithUsage` (non-breaking default interface method; existing implementors keep working and report `ModelUsage.None`). `AnthropicChat`, `OpenAiCompatibleChat`, and `BedrockChat` override it to surface real counts (Anthropic also captures cache read/write tokens). `ModelUsage` / `ChatResult`, a thread-safe `UsageAccumulator` (rolls up per capability + modelId, with latency), and a config `ModelPricing` table (dated default; tokens are facts, price is policy — unknown model → cost `null`, local/Ollama → `$0` but still counted). Counts only; never prompt/response content.
+
+> #12 emit-to-findings is deferred to the companion findings cost ticket (wire shape TBD); this lands the tamp-side capture/aggregate/cost. Both #16 and #12 remain open epics — this advances the locked source list and the usage-capture scope respectively.
+
 ## [0.2.0] — 2026-10-12
 
 ### Added

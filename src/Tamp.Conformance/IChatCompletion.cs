@@ -13,6 +13,14 @@ public interface IChatCompletion
     /// <summary>Complete a single-turn prompt. Implementations return the assistant's text content only.</summary>
     string Complete(string system, string user);
 
+    /// <summary>
+    /// Complete a prompt and also surface the provider-reported token usage (#12). Default implementation
+    /// calls <see cref="Complete"/> and reports <see cref="ModelUsage.None"/>, so existing implementors keep
+    /// working unchanged; the BYOK adapters override this to return real counts. Callers that want usage use
+    /// this and feed a <see cref="UsageAccumulator"/>; <see cref="Complete"/> stays the text-only convenience.
+    /// </summary>
+    ChatResult CompleteWithUsage(string system, string user) => new(Complete(system, user), ModelUsage.None);
+
     /// <summary>Identifier frozen into the attestation <c>Provenance.ModelId</c> (e.g. <c>anthropic/claude-opus-4-8</c>).</summary>
     string ModelId { get; }
 }

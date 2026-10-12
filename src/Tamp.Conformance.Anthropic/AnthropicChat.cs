@@ -32,7 +32,9 @@ public sealed class AnthropicChat : IChatCompletion, IDisposable
 
     public string ModelId => $"anthropic/{_config.ModelId}";
 
-    public string Complete(string system, string user)
+    public string Complete(string system, string user) => CompleteWithUsage(system, user).Text;
+
+    public ChatResult CompleteWithUsage(string system, string user)
     {
         var body = JsonSerializer.Serialize(new MessagesRequest
         {
@@ -68,7 +70,11 @@ public sealed class AnthropicChat : IChatCompletion, IDisposable
             if (block.Type == "text" && block.Text is not null)
                 sb.Append(block.Text);
         }
-        return sb.ToString();
+        var u = parsed.Usage;
+        var usage = u is null
+            ? ModelUsage.None
+            : new ModelUsage(u.InputTokens, u.OutputTokens, u.CacheReadInputTokens, u.CacheCreationInputTokens);
+        return new ChatResult(sb.ToString(), usage);
     }
 
     /// <summary>
@@ -122,6 +128,15 @@ public sealed class AnthropicChat : IChatCompletion, IDisposable
     {
         public IReadOnlyList<ContentBlock>? Content { get; init; }
         public string? StopReason { get; init; }
+        public UsageInfo? Usage { get; init; }
+    }
+
+    private sealed record UsageInfo
+    {
+        public long InputTokens { get; init; }
+        public long OutputTokens { get; init; }
+        public long CacheReadInputTokens { get; init; }
+        public long CacheCreationInputTokens { get; init; }
     }
 
     private sealed record ContentBlock
