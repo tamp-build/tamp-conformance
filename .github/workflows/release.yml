@@ -119,7 +119,9 @@ jobs:
       # and its glob covers all five Tamp.Conformance* package ids.
       - name: NuGet login (OIDC -> temp API key)
         if: ${{ github.event_name == 'push' || inputs.dry_run == false }}
-        uses: NuGet/login@v1
+        # Pinned to a commit hash (v1.2.0) rather than the mutable v1 tag:
+        # a moved tag would otherwise hand a third party the OIDC id-token.
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
         id: nuget-login
         with:
           user: BrewingCoder
