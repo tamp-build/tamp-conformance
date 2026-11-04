@@ -86,11 +86,19 @@ public sealed class LlmRuleExtractor : IRuleExtractor
         return sb.ToString();
     }
 
+    /// <summary>Regex match timeout for parsing this extractor's model responses. Test seam; defaults to <see cref="RegexLimits.MatchTimeout"/>.</summary>
+    internal TimeSpan MatchTimeout { get; init; } = RegexLimits.MatchTimeout;
+
+    /// <summary>
+    /// Extract rules from one ADR. Throws <see cref="FormatException"/> when the model output is unusable —
+    /// specifically <see cref="ModelOutputParseTimeoutException"/> when parsing it timed out — so a failed
+    /// extraction can never masquerade as "this ADR yields no rules".
+    /// </summary>
     public IReadOnlyList<AdrRule> Extract(string adrId, string adrText)
     {
         var user = $"ADR id: {adrId}\n\n----- ADR TEXT -----\n{adrText}";
         var raw = _model.Complete(BuildSystemPrompt(), user);
-        var json = ExtractJsonObject(raw);
+        var json = ExtractJsonObject(raw, MatchTimeout);
         var parsed = JsonSerializer.Deserialize<ExtractionResult>(json, JsonOpts)
                      ?? throw new FormatException("Rule extraction returned no parseable object.");
         return parsed.Rules ?? Array.Empty<AdrRule>();
@@ -102,16 +110,35 @@ public sealed class LlmRuleExtractor : IRuleExtractor
     /// markdown code fences, and surrounding prose. Strips reasoning, prefers a fenced object, then falls back to
     /// the outermost <c>{…}</c>.
     /// </summary>
-    internal static string ExtractJsonObject(string raw)
+    internal static string ExtractJsonObject(string raw) => ExtractJsonObject(raw, RegexLimits.MatchTimeout);
+
+    /// <inheritdoc cref="ExtractJsonObject(string)"/>
+    /// <exception cref="ModelOutputParseTimeoutException">Parsing exceeded <paramref name="matchTimeout"/>.</exception>
+    internal static string ExtractJsonObject(string raw, TimeSpan matchTimeout)
     {
         if (string.IsNullOrWhiteSpace(raw))
             throw new FormatException("No JSON object found in model output (empty).");
 
-        // 1. Drop reasoning blocks some models emit inline — their braces would corrupt the brace scan.
-        var cleaned = ThinkBlock.Replace(raw, string.Empty);
+        var (thinkBlock, fencedObject) = matchTimeout == RegexLimits.MatchTimeout
+            ? (ThinkBlock, FencedObject)
+            : (new Regex(ThinkBlockPattern, ModelOutputOptions, matchTimeout), new Regex(FencedObjectPattern, ModelOutputOptions, matchTimeout));
 
-        // 2. Prefer the contents of a fenced code block if the model wrapped the JSON in one.
-        var fence = FencedObject.Match(cleaned);
+        string cleaned;
+        Match fence;
+        try
+        {
+            // 1. Drop reasoning blocks some models emit inline — their braces would corrupt the brace scan.
+            cleaned = thinkBlock.Replace(raw, string.Empty);
+
+            // 2. Prefer the contents of a fenced code block if the model wrapped the JSON in one.
+            fence = fencedObject.Match(cleaned);
+        }
+        catch (RegexMatchTimeoutException ex)
+        {
+            // Unusable response — surface it, never degrade to "no JSON" / "no rules".
+            throw new ModelOutputParseTimeoutException(raw.Length, matchTimeout, ex);
+        }
+
         if (fence.Success)
             return fence.Groups[1].Value;
 
@@ -123,11 +150,18 @@ public sealed class LlmRuleExtractor : IRuleExtractor
         return cleaned.Substring(start, end - start + 1);
     }
 
-    private static readonly Regex ThinkBlock =
-        new("<think(?:ing)?>.*?</think(?:ing)?>", RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    // These patterns run over model output — untrusted, unbounded text — so they use the NonBacktracking
+    // engine: matching is linear in the input regardless of its shape. Under the default backtracking engine
+    // the greedy `\{.*\}` in FencedObject re-scans the rest of the response from every ``` it tries, which is
+    // quadratic on a long response full of unterminated fences; ThinkBlock's lazy `.*?` is likewise quadratic
+    // on many unclosed <think> tags. Same match semantics, no worst case. The timeout stays as the backstop.
+    private const RegexOptions ModelOutputOptions = RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.NonBacktracking;
 
-    private static readonly Regex FencedObject =
-        new(@"```(?:json)?\s*(\{.*\})\s*```", RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private const string ThinkBlockPattern = "<think(?:ing)?>.*?</think(?:ing)?>";
+    private const string FencedObjectPattern = @"```(?:json)?\s*(\{.*\})\s*```";
+
+    private static readonly Regex ThinkBlock = new(ThinkBlockPattern, ModelOutputOptions, RegexLimits.MatchTimeout);
+    private static readonly Regex FencedObject = new(FencedObjectPattern, ModelOutputOptions, RegexLimits.MatchTimeout);
 
     internal static readonly JsonSerializerOptions JsonOpts = new()
     {

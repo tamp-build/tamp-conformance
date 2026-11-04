@@ -73,6 +73,56 @@ public sealed class LlmRuleExtractorTests
         Assert.Throws<FormatException>(() => new LlmRuleExtractor(new FakeModel("I could not do that.")).Extract("0018", "x"));
     }
 
+    // ---- regex hardening (#26): identical extraction, linear time, timeouts are failures not empties ----
+
+    [Theory]
+    [InlineData("{\"rules\":[]}", "{\"rules\":[]}")]
+    [InlineData("prose {\"a\":{\"b\":1}} trailing", "{\"a\":{\"b\":1}}")]
+    [InlineData("```json\n{\"a\":1}\n```", "{\"a\":1}")]
+    [InlineData("```JSON  {\"a\":{\"b\":2}}  ```", "{\"a\":{\"b\":2}}")]
+    [InlineData("```\n{\"a\":1}\n```", "{\"a\":1}")]
+    [InlineData("<THINK>{x}</THINK>\n{\"a\":1}", "{\"a\":1}")]
+    [InlineData("<think>{x}</think> mid <thinking>{y}</thinking> {\"a\":1}", "{\"a\":1}")]
+    // Greedy fence capture spans to the last `}` before the last fence — pinned so the engine swap can't drift it.
+    [InlineData("```json\n{\"a\":1}\n```\ntext\n```json\n{\"b\":2}\n```", "{\"a\":1}\n```\ntext\n```json\n{\"b\":2}")]
+    // An unclosed think tag is left alone, exactly as before.
+    [InlineData("<think>{x} {\"a\":1}", "{x} {\"a\":1}")]
+    public void ExtractJsonObject_Output_Is_Unchanged_For_Normal_Responses(string raw, string expected)
+    {
+        Assert.Equal(expected, LlmRuleExtractor.ExtractJsonObject(raw));
+    }
+
+    [Fact]
+    public void Pathological_Model_Output_Parses_Without_Hanging()
+    {
+        // ~1.8 MB of unterminated fences and unclosed think tags ending in a real answer. Quadratic under the
+        // backtracking engine (measured ~7.7 s here — past the 2 s timeout), linear under NonBacktracking
+        // (~12 ms); the fallback still finds the trailing object.
+        var junk = string.Concat(Enumerable.Repeat("```json {\"x\": <think> ", 80_000));
+        var raw = junk + "\n" + GoodJson;
+
+        var json = LlmRuleExtractor.ExtractJsonObject(raw);
+
+        Assert.StartsWith("{\"x\":", json);
+        Assert.EndsWith("]}", json);
+    }
+
+    [Fact]
+    public void Parse_Timeout_Surfaces_As_A_Distinguishable_Failure_Not_Empty_Rules()
+    {
+        // A valid response large enough that a 1-tick budget cannot cover it. It would extract cleanly given
+        // time — so an empty result here would be the silent "conformance run looked clean" failure mode.
+        var raw = "<think>" + new string('r', 4_000_000) + "</think>\n" + GoodJson;
+        var extractor = new LlmRuleExtractor(new FakeModel(raw)) { MatchTimeout = TimeSpan.FromTicks(1) };
+
+        var ex = Assert.Throws<ModelOutputParseTimeoutException>(() => extractor.Extract("0018", "x"));
+
+        Assert.Equal(raw.Length, ex.ResponseLength);
+        Assert.Contains(raw.Length.ToString("N0"), ex.Message);
+        Assert.IsType<System.Text.RegularExpressions.RegexMatchTimeoutException>(ex.InnerException);
+        Assert.IsAssignableFrom<FormatException>(ex);   // existing "unparseable output" handling still applies
+    }
+
     [Fact]
     public void System_Prompt_Carries_The_Robustness_Guidance()
     {

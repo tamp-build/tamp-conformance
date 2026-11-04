@@ -16,6 +16,8 @@ public static class ReverseExamination
     /// Scan candidate files for deterministic decision signals. Each entry in
     /// <paramref name="signals"/> maps a candidate kind (e.g. <c>"new-dependency"</c>) to a regex whose
     /// matches are surfaced as <see cref="DecisionCandidate"/>s. Pure and free; the model only sees hits.
+    /// Throws <see cref="RegexMatchTimeoutException"/> (naming the signal and file:line) if a signal pattern
+    /// runs away — an incomplete scan is reported, not passed off as "no candidates".
     /// </summary>
     public static IReadOnlyList<DecisionCandidate> Triggers(
         AbsolutePath repoRoot,
@@ -23,7 +25,7 @@ public static class ReverseExamination
         IReadOnlyDictionary<string, string> signals)
     {
         var candidates = new List<DecisionCandidate>();
-        var compiled = signals.ToDictionary(kv => kv.Key, kv => new Regex(kv.Value));
+        var compiled = signals.ToDictionary(kv => kv.Key, kv => new Regex(kv.Value, RegexOptions.None, RegexLimits.MatchTimeout));
 
         foreach (var f in files)
         {
@@ -36,7 +38,16 @@ public static class ReverseExamination
             {
                 foreach (var (kind, rx) in compiled)
                 {
-                    if (rx.IsMatch(lines[i]))
+                    bool hit;
+                    try { hit = rx.IsMatch(lines[i]); }
+                    catch (RegexMatchTimeoutException ex)
+                    {
+                        // A runaway signal pattern means the scan is incomplete. Skipping the line would silently
+                        // under-report; name the signal and location so the pattern can be fixed.
+                        throw new RegexMatchTimeoutException(
+                            $"Reverse-examination signal '{kind}' (/{ex.Pattern}/) exceeded the {ex.MatchTimeout.TotalMilliseconds:N0} ms match timeout at {rel}:{i + 1}.", ex);
+                    }
+                    if (hit)
                         candidates.Add(new DecisionCandidate { Kind = kind, Detail = lines[i].Trim(), File = rel, Line = i + 1 });
                 }
             }

@@ -9,7 +9,7 @@ namespace Tamp.Conformance;
 /// </summary>
 public static class RuleStore
 {
-    private static readonly Regex AdrName = new(@"^(\d{3,})-.+\.md$", RegexOptions.IgnoreCase);
+    private static readonly Regex AdrName = new(@"^(\d{3,})-.+\.md$", RegexOptions.IgnoreCase, RegexLimits.MatchTimeout);
 
     /// <summary>ADR files in <paramref name="adrDir"/> whose name is <c>NNNN-*.md</c>, paired with the extracted ADR id. README and non-numbered files are ignored.</summary>
     public static IReadOnlyList<(string AdrId, AbsolutePath File)> AdrFiles(AbsolutePath adrDir)

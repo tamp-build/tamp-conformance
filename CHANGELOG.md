@@ -6,6 +6,11 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Security
+
+- **Regex execution is bounded (Sonar S6444, ReDoS hardening)** ([#26](https://github.com/tamp-build/tamp-conformance/issues/26)). Every regex the package builds now passes one match timeout, defined once in `RegexLimits.MatchTimeout` (2 s). The model-output parsers in `LlmRuleExtractor` (think-block strip, fenced-object match) also move to `RegexOptions.NonBacktracking`: both were quadratic on long responses full of unterminated fences or unclosed `<think>` tags (measured 7.7 s on a 1.8 MB response, now ~12 ms) with identical match results on normal output. Path-glob matchers use the same linear engine.
+- **A regex timeout is never a clean result.** Model-output parsing throws the new `ModelOutputParseTimeoutException` (a `FormatException`, naming the response length), so rule extraction fails loudly instead of returning "no rules", and the semantic evaluator reports `error`. A timed-out deterministic `forbiddenPattern`/`requiredPattern` yields an `error` verdict (blocking when enforcing), not pass or fail. A runaway reverse-examination signal throws `RegexMatchTimeoutException` naming the signal and `file:line` instead of being skipped.
+
 ## [0.3.0] — 2026-10-12
 
 ### Added
