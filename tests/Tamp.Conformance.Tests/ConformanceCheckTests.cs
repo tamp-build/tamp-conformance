@@ -79,6 +79,22 @@ public sealed class ConformanceCheckTests
     }
 
     [Fact]
+    public void Runaway_Pattern_Times_Out_As_Error_Not_Pass_Or_Fail()
+    {
+        // A model-authored pattern with catastrophic backtracking must not hang the run — and a timed-out
+        // check did not complete, so it is an error (blocking), never a pass.
+        using var repo = new Repo();
+        var f = repo.Write("src/Foo.cs", new string('a', 64) + "!\n");
+        var set = OneRule(new AdrRule { Id = "0018-r7", Claim = "x", ForbiddenPattern = "^(a|aa)+$", Scope = new[] { "src/**" } });
+
+        var r = ConformanceCheck.CheckDeterministic(set, repo.Root, new[] { f }, emit: false)[0];
+
+        Assert.Equal(ConformanceVerdict.Error, r.Verdict);
+        Assert.Contains("match timeout", r.CodeEvidence);
+        Assert.True(r.Blocks);
+    }
+
+    [Fact]
     public void Deterministic_Rule_With_No_Predicate_Is_Unknown()
     {
         using var repo = new Repo();

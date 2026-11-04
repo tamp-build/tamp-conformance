@@ -46,6 +46,20 @@ public sealed class ReverseExaminationTests : IDisposable
         Assert.Equal(2, c.Line);
     }
 
+    [Fact]
+    public void Triggers_Runaway_Signal_Throws_Naming_Signal_And_Location()
+    {
+        // Catastrophic backtracking on a single line — must fail loudly, not be skipped as "no candidates".
+        var f = Write("src/Bad.cs", "ok\n" + new string('a', 64) + "!\n");
+        var signals = new Dictionary<string, string> { ["redos"] = "^(a|aa)+$" };
+
+        var ex = Assert.Throws<System.Text.RegularExpressions.RegexMatchTimeoutException>(
+            () => ReverseExamination.Triggers(_root, new[] { f }, signals));
+
+        Assert.Contains("'redos'", ex.Message);
+        Assert.Contains("src/Bad.cs:2", ex.Message);
+    }
+
     // ---- detector parsing ----
 
     [Fact]

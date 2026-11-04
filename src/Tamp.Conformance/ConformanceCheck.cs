@@ -127,7 +127,7 @@ public static class ConformanceCheck
         {
             if (!string.IsNullOrEmpty(rule.ForbiddenPattern))
             {
-                var forbidden = new Regex(rule.ForbiddenPattern);
+                var forbidden = new Regex(rule.ForbiddenPattern, RegexOptions.None, RegexLimits.MatchTimeout);
                 foreach (var f in inScope)
                 {
                     var lines = File.ReadAllLines(f.Value);
@@ -141,7 +141,7 @@ public static class ConformanceCheck
             }
 
             // RequiredPattern: must appear in at least one in-scope file.
-            var required = new Regex(rule.RequiredPattern!);
+            var required = new Regex(rule.RequiredPattern!, RegexOptions.None, RegexLimits.MatchTimeout);
             foreach (var f in inScope)
             {
                 var lines = File.ReadAllLines(f.Value);
@@ -152,6 +152,12 @@ public static class ConformanceCheck
                 }
             }
             return Result(ConformanceVerdict.Fail, $"required pattern /{rule.RequiredPattern}/ not found in scope");
+        }
+        catch (RegexMatchTimeoutException ex)
+        {
+            // The check did not complete — an error, never a pass (and never a fail we can't evidence).
+            return Result(ConformanceVerdict.Error,
+                $"pattern /{ex.Pattern}/ exceeded the {ex.MatchTimeout.TotalMilliseconds:N0} ms match timeout; the check did not complete");
         }
         catch (Exception ex) when (ex is RegexParseException or IOException or UnauthorizedAccessException)
         {
@@ -207,6 +213,8 @@ public static class ConformanceCheck
             }
         }
         sb.Append('$');
-        return new Regex(sb.ToString());
+        // Generated from escaped literals plus `.*` / `[^/]*` only, so the linear-time engine always applies;
+        // adjacent `**` segments would otherwise backtrack polynomially.
+        return new Regex(sb.ToString(), RegexOptions.NonBacktracking, RegexLimits.MatchTimeout);
     }
 }
