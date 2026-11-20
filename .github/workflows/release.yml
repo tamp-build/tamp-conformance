@@ -16,7 +16,6 @@ on:
         default: true
 
 permissions:
-  id-token: write   # OIDC token for nuget.org trusted publishing
   contents: read
 
 env:
@@ -32,6 +31,12 @@ jobs:
     name: pack + push to nuget.org via Tamp
     runs-on: ubuntu-latest
     environment: release
+    # id-token is scoped to this job rather than the workflow (Sonar
+    # githubactions:S8233): it is the credential that mints a nuget.org key,
+    # so no job that does not publish should be able to request one.
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - name: Checkout
@@ -80,9 +85,8 @@ jobs:
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: |
-            8.0.x
-            9.0.x
             10.0.x
+            11.0.x
 
       # Tag is the source of truth for shipped versions. Strips the
       # leading "v" (so v0.1.0 → 0.1.0). PACKAGE_VERSION flows through
